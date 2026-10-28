@@ -1,0 +1,1160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Char2D Technical Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700&family=Pixelify+Sans:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --blue-700:#0456F8; --blue-500:#0F7DF8; --sky-400:#0BA4F1; --cyan-400:#09BFD7;
+  --teal-400:#20CBA0; --green-500:#34BE69; --lime-400:#73D945; --navy-800:#1740B4;
+  --grad: linear-gradient(90deg,#0456F8 0%,#0BA4F1 35%,#20CBA0 65%,#73D945 100%);
+  --bg:#F7FBFF; --surface:#FFFFFF; --surface-2:#EEF6FF; --border:#D4E4F7;
+  --text:#0E1B3D; --muted:#5B6B8C; --code-bg:#0E1B3D; --code-text:#E6F1FF;
+  --link:#0F6FE0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#0B1430; --surface:#111D42; --surface-2:#182756; --border:#24376E;
+    --text:#EAF3FF; --muted:#9DB0D9; --code-bg:#070E24; --link:#5CC2FF;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:#0B1430; --surface:#111D42; --surface-2:#182756; --border:#24376E;
+  --text:#EAF3FF; --muted:#9DB0D9; --code-bg:#070E24; --link:#5CC2FF;
+}
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; scroll-padding-top:24px; }
+body { margin:0; background:var(--bg); color:var(--text);
+  font:16px/1.65 Nunito, system-ui, sans-serif; }
+a { color:var(--link); }
+.hero { position:relative; overflow:hidden; padding:48px 16px 40px; text-align:center;
+  background:var(--surface); border-bottom:1px solid var(--border); }
+.hero::after { content:""; position:absolute; left:0; right:0; bottom:0; height:6px; background:var(--grad); }
+.hero img { width:180px; height:180px; object-fit:cover; border-radius:24px; }
+.hero h1 { margin:8px 0 4px; font:700 clamp(36px,6vw,56px)/1.1 Fredoka, sans-serif;
+  background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.hero .sub { font-family:"Pixelify Sans", monospace; color:var(--muted); letter-spacing:.06em; }
+.hero .meta { margin-top:16px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+.chip { font:600 13px "Pixelify Sans", monospace; padding:4px 10px; background:var(--surface-2);
+  border:2px solid var(--border); box-shadow:0 2px 0 var(--border); }
+.spark { position:absolute; color:var(--lime-400); font:700 28px "Pixelify Sans"; opacity:.8; }
+.layout { display:grid; grid-template-columns:260px minmax(0,1fr); gap:40px;
+  max-width:1240px; margin:0 auto; padding:32px 24px 80px; }
+nav.toc { position:sticky; top:24px; align-self:start; max-height:calc(100vh - 48px); overflow:auto;
+  background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px;
+  box-shadow:0 4px 0 var(--border); }
+nav.toc h2 { margin:0 0 8px; font:700 14px "Pixelify Sans", monospace; color:var(--muted);
+  text-transform:uppercase; letter-spacing:.08em; border:0; padding:0; }
+nav.toc ol { list-style:none; margin:0; padding:0; }
+nav.toc a { display:block; padding:5px 8px; border-radius:6px; color:var(--text);
+  text-decoration:none; font-size:14px; }
+nav.toc a:hover, nav.toc a.active { background:var(--surface-2); color:var(--link); }
+main { min-width:0; }
+main h2 { font:700 28px/1.2 Fredoka, sans-serif; margin:56px 0 16px; padding-bottom:10px;
+  border-bottom:3px solid transparent; border-image:var(--grad) 1; }
+main h2:first-child { margin-top:0; }
+main h3 { font:600 20px/1.3 Fredoka, sans-serif; margin:32px 0 10px; color:var(--navy-800); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) main h3 { color:#7FB8FF; } }
+:root[data-theme="dark"] main h3 { color:#7FB8FF; }
+main hr { border:0; height:1px; background:var(--border); margin:32px 0; }
+.table-wrap { overflow-x:auto; margin:16px 0; border:1px solid var(--border); border-radius:12px;
+  background:var(--surface); box-shadow:0 4px 0 var(--border); }
+table { border-collapse:collapse; width:100%; font-size:14.5px; }
+th, td { padding:9px 12px; text-align:left; vertical-align:top; border-bottom:1px solid var(--border); }
+th { background:var(--surface-2); font-weight:700; white-space:nowrap; }
+tr:last-child td { border-bottom:0; }
+code { font:0.88em "JetBrains Mono", ui-monospace, monospace; background:var(--surface-2);
+  padding:1px 5px; border-radius:4px; }
+pre { background:var(--code-bg); color:var(--code-text); padding:16px 18px; border-radius:12px;
+  overflow-x:auto; line-height:1.5; border:2px solid #1740B4; box-shadow:0 4px 0 #1740B4; }
+pre code { background:none; padding:0; color:inherit; font-size:13px; }
+blockquote { margin:16px 0; padding:12px 16px; background:var(--surface-2);
+  border-left:4px solid var(--sky-400); border-radius:0 8px 8px 0; }
+.ok { display:inline-block; color:#fff; background:var(--green-500); font:700 12px "Pixelify Sans";
+  padding:0 6px; margin-right:4px; }
+.theme-btn { position:fixed; right:16px; top:16px; z-index:5; font:600 13px "Pixelify Sans", monospace;
+  background:var(--surface); color:var(--text); border:2px solid var(--navy-800);
+  box-shadow:0 3px 0 var(--navy-800); padding:6px 10px; cursor:pointer; }
+.theme-btn:active { transform:translateY(2px); box-shadow:0 1px 0 var(--navy-800); }
+@media (max-width: 900px) {
+  .layout { grid-template-columns:1fr; padding:24px 16px 64px; gap:24px; }
+  nav.toc { position:static; max-height:none; }
+}
+@media print { nav.toc, .theme-btn, .spark { display:none; } .layout { display:block; } }
+</style>
+</head>
+<body>
+<button class="theme-btn" type="button" aria-label="Toggle dark mode">☾ / ☀</button>
+<header class="hero">
+  <span class="spark" style="left:12%;top:22%">✚</span>
+  <span class="spark" style="left:18%;top:62%;color:#0BA4F1;font-size:20px">✚</span>
+  <span class="spark" style="right:14%;top:30%;color:#20CBA0">✚</span>
+  <span class="spark" style="right:20%;top:66%;font-size:18px">✚</span>
+  <img src="media/logo.jpeg" alt="Char2D logo">
+  <h1>Technical Plan</h1>
+  <div class="sub">— PIXEL CHARACTER MAKER —</div>
+  <div class="meta">
+    <span class="chip">Design v1 · 2026-10-28</span>
+    <span class="chip">Next.js + SQLite</span>
+    <span class="chip">Muse API</span>
+    <span class="chip">Open source</span>
+  </div>
+</header>
+<div class="layout">
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol><li><a href="#0-tldr">0. TL;DR</a></li><li><a href="#1-product-scope">1. Product scope</a></li><li><a href="#2-system-architecture">2. System architecture</a></li><li><a href="#3-muse-api-integration">3. Muse API integration</a></li><li><a href="#4-data-model-sqlite-drizzle">4. Data model (SQLite / Drizzle)</a></li><li><a href="#5-sprite-generation-pipeline">5. Sprite generation pipeline</a></li><li><a href="#6-runtime-contracts">6. Runtime contracts</a></li><li><a href="#7-chat-agent-adjust-vs-create">7. Chat agent (adjust vs create)</a></li><li><a href="#8-api-surface-next-route-handlers-runtime-nodejs">8. API surface (Next route handlers, runtime = 'nodejs')</a></li><li><a href="#9-frontend">9. Frontend</a></li><li><a href="#10-ui-and-visual-design-matching-the-logo">10. UI and visual design (matching the logo)</a></li><li><a href="#11-repository-layout">11. Repository layout</a></li><li><a href="#12-porting-notes-from-sprite-gen-what-to-take-what-to-skip">12. Porting notes from sprite-gen (what to take, what to skip)</a></li><li><a href="#13-milestones">13. Milestones</a></li><li><a href="#14-testing-strategy">14. Testing strategy</a></li><li><a href="#15-risks-and-mitigations">15. Risks and mitigations</a></li><li><a href="#16-open-questions-for-the-product-owner">16. Open questions for the product owner</a></li></ol></nav>
+  <main><hr />
+<h2 id="0-tldr">0. TL;DR</h2>
+<table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Decision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>App</td>
+<td>Single <strong>Next.js 15 (App Router) + React 19 + TypeScript</strong> app. No separate backend service.</td>
+</tr>
+<tr>
+<td>DB</td>
+<td><strong>SQLite</strong> in <code>./data/char2d.db</code> through <strong>Drizzle ORM + better-sqlite3</strong>. Migrations run automatically on boot.</td>
+</tr>
+<tr>
+<td>Files</td>
+<td>Local filesystem under <code>./data/assets/…</code>, served by a Next route handler.</td>
+</tr>
+<tr>
+<td>AI</td>
+<td><strong>Muse API</strong> (Meta) for both the <strong>chat/planner LLM</strong> and <strong>image generation</strong>, behind a provider interface (<code>src/server/ai/</code>).</td>
+</tr>
+<tr>
+<td>Sprite pipeline</td>
+<td><strong>Atlas approach.</strong> (1) Generate a <strong>character sheet</strong> from the user's image. (2) For every action, generate <strong>one horizontal strip</strong> of frames in one image call, with the sheet as reference. (3) If an action needs more frames than fit in one strip, generate <strong>additional strips</strong> conditioned on the previous strip. (4) Deterministic post-processing (chroma key → frame split → pixel snap → shared palette → align) runs in TS and composes <strong>one atlas PNG + <code>manifest.json</code></strong> per character.</td>
+</tr>
+<tr>
+<td>Prior art</td>
+<td>Algorithms ported/adapted from <code>../sprite-gen</code> (Apache-2.0): row prompts, layout guides, chroma unmixing, component-based extraction, "pixel-unfake" grid snap, shared palette. We keep its NOTICE attribution.</td>
+</tr>
+<tr>
+<td>Jobs</td>
+<td>SQLite-backed job queue plus an in-repo <strong>worker process</strong>, started together with Next by <code>npm run dev</code>. Progress reaches the UI over <strong>SSE</strong>.</td>
+</tr>
+<tr>
+<td>Game runtime</td>
+<td><strong>Phaser 3</strong> for the Playground (two sample worlds). A lightweight canvas <code>&lt;SpritePlayer&gt;</code> handles the Character Maker preview. Both read the same manifest.</td>
+</tr>
+<tr>
+<td>View types</td>
+<td><code>side_scroller</code> (Mario-like: left, right, jump, crouch) and <code>top_down</code> (the "geometric"/overhead RPG view: up, down, left, right). The view type is chosen at creation, and worlds that don't match it are disabled.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-product-scope">1. Product scope</h2>
+<h3 id="11-features-v1">1.1 Features (v1)</h3>
+<ol>
+<li><strong>Create a character from one image.</strong> Upload a photo, drawing, or anime image. Pick a <strong>view type</strong>, and optionally add a name and a short description. The app generates a pixel-art <strong>character sheet</strong>, then the <strong>default actions</strong> for that view type.</li>
+<li><strong>Character Maker page.</strong> The character stands animated in the centre of a stage. Clicking an action chip (or pressing its bound key) plays that action. Controls: play/pause, speed, frame scrubber, onion skin, flip, background (checker, grass, dark).</li>
+<li><strong>Chat bar</strong> at the bottom. The user writes a free-form request ("make the jump floatier", "add a spinning sword attack on J", "dash forward fast"). The agent decides whether this means <strong>adjusting an existing action</strong> or <strong>creating a new one</strong>. It plans the action (poses per frame, timing, canvas, loop mode) and calls image generation. Results stream into the stage.</li>
+<li><strong>Button mapping.</strong> Every action can be bound to keyboard keys or gamepad buttons, with a trigger mode (press/hold/toggle). Defaults are set per view type, and conflicting bindings are detected.</li>
+<li><strong>Playground</strong> with two sample worlds:
+   - <strong>Side-scroller world</strong>: platforms, gravity, a scrolling camera.
+   - <strong>Top-down world</strong>: a 4-direction overhead map with y-sorting.</li>
+</ol>
+<p>The world that doesn't match the selected character's view type is <strong>disabled</strong> (greyed out, with a tooltip). Several characters can be added at once: local P1/P2 on separate key profiles, plus extra characters as idle "NPCs" that you can switch control to.
+6. <strong>Export</strong> (low cost, high value for an open-source tool): download the atlas PNG, <code>manifest.json</code>, a Phaser atlas JSON, and a GIF for each action.</p>
+<h3 id="12-non-goals-for-v1">1.2 Non-goals for v1</h3>
+<ul>
+<li>Accounts and multi-user hosting (the app runs locally, single user).</li>
+<li>True 8-direction isometric. This is a stretch goal; the data model already supports arbitrary directions.</li>
+<li>Pixel editing tools beyond "regenerate" and "retime".</li>
+<li>Mobile authoring. The Playground should work with touch controls, but the Maker targets desktop.</li>
+</ul>
+<h3 id="13-default-actions-by-view-type">1.3 Default actions by view type</h3>
+<p><code>R</code> = generated facing right. <strong>Left is a horizontal mirror of right by default</strong>, which halves cost. The character can opt into <code>mirrorLeft: false</code> if it has asymmetric details (a sword hand, a hair clip), and then the left strips are generated separately.</p>
+<table>
+<thead>
+<tr>
+<th>View type</th>
+<th>Action id</th>
+<th>Directions</th>
+<th>Frames</th>
+<th>FPS</th>
+<th>Playback</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>side_scroller</td>
+<td><code>idle</code></td>
+<td>R (+mirror)</td>
+<td>4</td>
+<td>6</td>
+<td>loop</td>
+<td>subtle breathing + blink</td>
+</tr>
+<tr>
+<td>side_scroller</td>
+<td><code>walk</code></td>
+<td>R (+mirror)</td>
+<td>6</td>
+<td>10</td>
+<td>loop</td>
+<td>covers "move left/right"</td>
+</tr>
+<tr>
+<td>side_scroller</td>
+<td><code>jump</code></td>
+<td>R (+mirror)</td>
+<td>4</td>
+<td>10</td>
+<td>once → hold last</td>
+<td>crouch, takeoff, airborne, fall pose. The engine owns the height.</td>
+</tr>
+<tr>
+<td>side_scroller</td>
+<td><code>crouch</code></td>
+<td>R (+mirror)</td>
+<td>2</td>
+<td>8</td>
+<td>once → hold last</td>
+<td>down into crouch, then hold</td>
+</tr>
+<tr>
+<td>top_down</td>
+<td><code>idle</code></td>
+<td>down, up, R (+mirror)</td>
+<td>2–4</td>
+<td>6</td>
+<td>loop</td>
+<td></td>
+</tr>
+<tr>
+<td>top_down</td>
+<td><code>walk</code></td>
+<td>down, up, R (+mirror)</td>
+<td>4–6</td>
+<td>10</td>
+<td>loop</td>
+<td>covers move up/down/left/right</td>
+</tr>
+</tbody>
+</table>
+<p>The defaults generate <strong>4 strips</strong> for side_scroller and <strong>6 strips</strong> for top_down, plus 1 sheet. All animation is <strong>in place</strong>: the character never travels inside a strip. Displacement (movement, jump height, dash distance) belongs to the game engine and is configured per action (§6.4). This is critical, because it keeps frames aligned and lets the AI tune "higher/faster" without regenerating images.</p>
+<hr />
+<h2 id="2-system-architecture">2. System architecture</h2>
+<pre><code>┌────────────────────────── Next.js app (one repo, one `npm run dev`) ──────────────────────────┐
+│                                                                                                │
+│  Browser                                                                                       │
+│  ├─ /                      Home / character gallery                                            │
+│  ├─ /create                Upload + view-type wizard                                           │
+│  ├─ /characters/[id]       Character Maker (stage, action bar, chat bar, bindings)             │
+│  └─ /playground            Phaser worlds (side_scroller | top_down)                            │
+│        ▲  REST (route handlers) + SSE (/api/events)                                            │
+│        │                                                                                       │
+│  Server (Node runtime route handlers)                                                          │
+│  ├─ src/server/db          Drizzle schema, migrations, repositories                            │
+│  ├─ src/server/ai          MuseClient, LLM agent (tools), image provider interface             │
+│  ├─ src/server/pipeline    sheet → strips → extract → pixel snap → palette → atlas             │
+│  ├─ src/server/jobs        enqueue / claim / progress / retry (SQLite)                         │
+│  └─ src/server/storage     ./data/assets file IO                                               │
+│                                                                                                │
+│  Worker process (`tsx src/worker/index.ts`)  ← same code, separate process                     │
+│  └─ polls `jobs` table → runs pipeline steps → writes assets + rows → emits progress events    │
+└────────────────────────────────────────────────────────────────────────────────────────────────┘
+                 │ HTTPS                                  
+                 ▼                                         
+           Muse API (chat + image)                         
+</code></pre>
+<p><strong>Why a separate worker process:</strong> image generation takes roughly 10–60 s per call and a character needs 5–7 calls. Route handlers must return quickly, and Next dev-mode hot reload would otherwise kill in-flight jobs. <code>npm run dev</code> runs <code>concurrently "next dev" "tsx watch src/worker"</code>. Both processes open the same SQLite file in <strong>WAL mode</strong>.</p>
+<p><strong>Progress events:</strong> the worker writes rows to <code>job_events</code>. <code>/api/events?characterId=</code> is an SSE route that tails that table (it polls every 500 ms, which is cheap on SQLite) and pushes to the browser. This avoids Redis and websockets and keeps the clone-and-run promise.</p>
+<hr />
+<h2 id="3-muse-api-integration">3. Muse API integration</h2>
+<p>Muse provides both the planner/chat model and the image model. All Muse calls go through <strong>one module</strong>, <code>src/server/ai/muse.ts</code>, and are exposed behind two interfaces. Muse is the default, and swapping in another provider later means adding one adapter.</p>
+<pre><code class="language-ts">// src/server/ai/types.ts
+export interface ChatModel {
+  chat(req: {
+    system: string;
+    messages: ChatMessage[];
+    tools?: ToolDef[];                 // JSON-schema tools
+    responseSchema?: JSONSchema;       // structured output when no tools
+    temperature?: number;
+    signal?: AbortSignal;
+  }): Promise&lt;ChatResult&gt;;             // { text?, toolCalls?: {name,args}[], usage }
+  stream?(...): AsyncIterable&lt;ChatDelta&gt;;
+}
+
+export interface ImageModel {
+  readonly caps: {
+    referenceImages: number;           // max refs accepted (sheet, prev strip, layout guide)
+    nativeTransparency: boolean;       // real alpha out?
+    sizes: Array&lt;[number, number]&gt;;    // allowed output sizes, e.g. [1536,1024]
+    edit: boolean;                     // supports image-to-image / edit endpoint
+  };
+  generate(req: {
+    prompt: string;
+    references?: Buffer[];             // PNGs
+    size: [number, number];
+    transparent?: boolean;
+    seed?: number;
+    signal?: AbortSignal;
+  }): Promise&lt;{ png: Buffer; raw: unknown; usage?: unknown }&gt;;
+}
+</code></pre>
+<h3 id="31-muse-capabilities-to-verify-before-phase-1-task-for-the-tech-lead">3.1 Muse capabilities to verify before Phase 1 (task for the tech lead)</h3>
+<p>The pipeline depends on these. Each row lists the fallback if Muse lacks the capability.</p>
+<table>
+<thead>
+<tr>
+<th>Needed</th>
+<th>Why</th>
+<th>Fallback if missing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Reference-image input</strong> on image gen (≥2 images)</td>
+<td>Identity consistency: every strip is conditioned on the sheet plus the layout guide</td>
+<td><strong>Blocker.</strong> At minimum we need 1 reference image (the sheet), with the layout described in text. If there is no image input at all, quality is not viable. Escalate.</td>
+</tr>
+<tr>
+<td>Landscape output size (≈1536×1024 or wider)</td>
+<td>Fits 4–6 frames per strip</td>
+<td>Use square 1024 and cap strips at 4 frames, using more strips</td>
+</tr>
+<tr>
+<td>Native transparent background</td>
+<td>Skips chroma keying</td>
+<td>Generate on a flat chroma key (default magenta <code>#FF00FF</code>) and key it out (§5.3). This is the default path anyway.</td>
+</tr>
+<tr>
+<td>Tool/function calling on chat</td>
+<td>Agent loop (§7)</td>
+<td>Use JSON-mode with a schema: ask for <code>{intent, plan}</code> and validate with zod, retrying once on parse failure</td>
+</tr>
+<tr>
+<td>Vision input on chat</td>
+<td>The agent looks at the current frames/sheet when the user says "fix the hand in frame 3"</td>
+<td>Send only text metadata (frame descriptions saved from the plan)</td>
+</tr>
+<tr>
+<td>Streaming</td>
+<td>Typing effect in chat</td>
+<td>Show a non-streamed response with a "thinking…" state</td>
+</tr>
+<tr>
+<td>Seed / determinism</td>
+<td>Reproducible re-rolls</td>
+<td>Store the prompt and refs. Without a seed a re-roll is simply a new sample.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-configuration">3.2 Configuration</h3>
+<p><code>.env.local</code> (<code>.env.example</code> is committed):</p>
+<pre><code>MUSE_API_KEY=
+MUSE_BASE_URL=            # default from Muse docs
+MUSE_CHAT_MODEL=          # e.g. muse-…  (fill from Muse docs)
+MUSE_IMAGE_MODEL=
+CHAR2D_DATA_DIR=./data
+CHAR2D_MAX_PARALLEL_IMAGE_JOBS=2
+</code></pre>
+<p>A <strong>Settings</strong> page shows whether a key is detected and has a "Test connection" button that makes one cheap chat call. Keys are never stored in SQLite or sent to the browser.</p>
+<h3 id="33-client-rules">3.3 Client rules</h3>
+<ul>
+<li>All requests run server-side only (<code>import 'server-only'</code>).</li>
+<li>Retry 429 and 5xx with exponential backoff and jitter, at most 3 attempts. Don't retry on 4xx or content-policy errors, and show the user the reason.</li>
+<li>Every call logs <code>{model, prompt hash, latency, tokens/usage, cost estimate}</code> to <code>ai_calls</code> for debugging and a cost display.</li>
+<li>Save the raw image response in <code>assets/&lt;char&gt;/raw/</code> so the pipeline can be re-run without paying again.</li>
+</ul>
+<hr />
+<h2 id="4-data-model-sqlite-drizzle">4. Data model (SQLite / Drizzle)</h2>
+<p>All ids are <code>text</code> (nanoid). Timestamps are <code>integer</code> unix ms. JSON columns are <code>text</code> validated by zod on read.</p>
+<pre><code class="language-ts">characters
+  id, name, description,
+  view_type        'side_scroller' | 'top_down',
+  status           'draft' | 'generating' | 'ready' | 'error',
+  source_asset_id  → assets           // user upload
+  sheet_id         → character_sheets // active sheet
+  style_json       { logicalHeight: 48|64, paletteSize: 24, outline: true,
+                     chromaKey: '#FF00FF', mirrorLeft: true, cellW, cellH }
+  palette_json     string[]           // locked shared palette from the sheet
+  atlas_asset_id   → assets           // current composed atlas
+  manifest_json    Manifest            // current runtime manifest (§6.1)
+  atlas_version    integer             // cache-busting
+  created_at, updated_at
+
+character_sheets
+  id, character_id, version,
+  raw_asset_id, processed_asset_id,
+  views_json   { front:{rect}, back:{rect}, right:{rect}, … }  // extracted anchors
+  anchors_json { down: assetId, up: assetId, right: assetId }  // per-direction idle anchor PNGs
+  prompt, status, created_at
+
+actions
+  id, character_id,
+  key          'walk' | 'attack_spin' …   (slug, unique per character)
+  label, icon (emoji or pixel icon id),
+  is_default   boolean,
+  directions_json  ['right'] | ['down','up','right']
+  active_version_id → action_versions
+  gameplay_json    ActionGameplay (§6.4)
+  sort_order, created_at, updated_at
+
+action_versions                 // every generation/adjustment = new version → undo/redo
+  id, action_id, version, parent_version_id,
+  plan_json        ActionPlan (§7.3)    // poses, timing, canvas, playback
+  frames_json      { [direction]: FrameRef[] }   FrameRef = { assetId, w, h, anchorX, anchorY, durationMs }
+  strips_json      { [direction]: { rawAssetId, segment, prompt }[] }
+  status           'queued' | 'generating' | 'processing' | 'ready' | 'error',
+  error, created_by ('default' | 'chat' | 'manual'), chat_message_id,
+  created_at
+
+input_bindings
+  id, character_id, profile ('p1' | 'p2'),
+  action_id, device ('keyboard' | 'gamepad'),
+  code  ('KeyJ' | 'ArrowLeft' | 'pad:0' …),   // KeyboardEvent.code, not key
+  trigger ('press' | 'hold' | 'toggle'),
+  UNIQUE(character_id, profile, device, code)
+
+chat_messages
+  id, character_id, role ('user'|'assistant'|'tool'),
+  content, tool_calls_json, attachments_json, created_at
+
+jobs
+  id, type ('sheet'|'strip'|'process_action'|'compose_atlas'|'export'),
+  character_id, action_version_id, payload_json,
+  status ('queued'|'running'|'done'|'error'|'cancelled'),
+  attempts, max_attempts, run_after, locked_by, locked_at,
+  depends_on_json  string[],            // job ids that must be 'done' first
+  error, created_at, updated_at
+
+job_events      id (autoincrement), job_id, character_id, kind, data_json, created_at
+assets          id, character_id, kind, path, mime, width, height, bytes, sha256, created_at
+ai_calls        id, kind ('chat'|'image'), model, request_hash, latency_ms, usage_json, ok, error, created_at
+playground_scenes  id, world ('side_scroller'|'top_down'), name, characters_json, created_at  // optional saved sessions
+</code></pre>
+<p><strong>Job claiming:</strong> run <code>UPDATE jobs SET status='running', locked_by=?, locked_at=? WHERE id = (SELECT id FROM jobs WHERE status='queued' AND run_after&lt;=? AND &lt;deps done&gt; ORDER BY created_at LIMIT 1) RETURNING *</code> inside <code>BEGIN IMMEDIATE</code>. On worker boot, stale <code>running</code> jobs (locked more than 5 minutes ago) go back to <code>queued</code>.</p>
+<hr />
+<h2 id="5-sprite-generation-pipeline">5. Sprite generation pipeline</h2>
+<h3 id="51-overview">5.1 Overview</h3>
+<pre><code>user image
+   │  (A) normalize: EXIF rotate, cap 2048px, PNG
+   ▼
+(B) CHARACTER SHEET  ── 1 image call ──►  sheet_raw.png
+   │  (C) extract views → per-direction idle anchors, detect pixel grid, build palette
+   ▼
+for each action × direction:
+   (D) PLAN (LLM or default preset) → ActionPlan (frames, poses, timing, canvas)
+   (E) STRIP  ── 1 image call per ≤N frames ──►  strip_raw_k.png
+   (F) PROCESS (deterministic): key → split → snap → palette → outline → align → cells
+   ▼
+(G) COMPOSE ATLAS (deterministic): all active versions → atlas.png + manifest.json
+</code></pre>
+<p>Only <strong>B</strong> and <strong>E</strong> call the image model, and only <strong>D</strong> (for chat actions) calls the LLM. Everything else is deterministic and pure, so it can be unit-tested with fixtures.</p>
+<h3 id="52-b-character-sheet">5.2 (B) Character sheet</h3>
+<p><strong>Goal:</strong> turn the user's image into a clean, on-model, <strong>pixel-art anime</strong> turnaround on a flat key background. This image becomes the identity source for the whole character. Following sprite-gen's identity ownership: <em>the base/user image is used only to make the sheet, and later strips reference the sheet anchors, never the original upload.</em></p>
+<p><strong>Layout guide image</strong>, generated by code (<code>pipeline/guides.ts</code>): a 1536×1024 canvas, chroma-filled, with faint cell outlines and a baseline. The view sets differ by type:</p>
+<table>
+<thead>
+<tr>
+<th>view_type</th>
+<th>Sheet cells (left → right)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>side_scroller</td>
+<td><code>right</code> (side, facing right) · <code>front</code> · <code>back</code> (3 cells; front/back are for consistency and portraits)</td>
+</tr>
+<tr>
+<td>top_down</td>
+<td><code>down</code> (front 3/4 overhead) · <code>up</code> (back) · <code>right</code> (side)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Prompt template</strong> (<code>pipeline/prompts/sheet.ts</code>; final wording to be tuned against Muse):</p>
+<pre><code>Create a character turnaround sheet for a 2D video game.
+Style: anime-inspired pixel art, chibi proportions (head ≈ 1/3 of height), crisp square pixels,
+limited palette (~24 colors), 1px dark outline, flat cel shading, no anti-aliasing, no gradients,
+no text, no shadows on the ground.
+Character: &lt;user description or &quot;the character in the reference image&quot;&gt;. Preserve hair style and
+color, outfit, accessories, and color scheme from the reference.
+Layout: exactly 3 full-body poses standing in a neutral idle stance, one per invisible slot of the
+attached layout guide, left to right: &lt;views&gt;. Same size, same feet baseline, same scale, each
+fully inside its slot with padding; poses must not touch or overlap.
+Background: perfectly flat solid &lt;#FF00FF&gt; everywhere outside the character. Do not use &lt;key color&gt;
+anywhere on the character.
+</code></pre>
+<p>References: <code>[user_image, layout_guide]</code>.</p>
+<p><strong>Chroma key choice:</strong> sample the user image's dominant hues and pick the key furthest away from them, from {magenta <code>#FF00FF</code>, green <code>#00FF00</code>, cyan <code>#00FFFF</code>, blue <code>#0000FF</code>} (this ports sprite-gen's <code>--chroma-key auto</code>). Store the result in <code>style_json.chromaKey</code>.</p>
+<p><strong>User review (gate):</strong> show the sheet with "Looks good" / "Regenerate" / "Regenerate with note…". Default actions are queued <strong>only after acceptance</strong>, because a bad sheet poisons every strip. Give the user an "auto-accept" toggle for the fast path.</p>
+<h3 id="53-c-sheet-processing">5.3 (C) Sheet processing</h3>
+<ol>
+<li><strong>Chroma removal</strong> (<code>pixel/chroma.ts</code>): remove pixels within a distance threshold of the key (default 96 in RGB space), then unmix edge pixels into despilled RGB plus alpha (ported from sprite-gen <code>remove_chroma_background</code>). If the model returned real alpha, skip this step.</li>
+<li><strong>Connected components</strong> (<code>pixel/components.ts</code>): flood-fill alpha blobs, then pick the K largest as poses, sorted by x. Smaller blobs (detached hair strands, sparkles) attach to the nearest pose. If K is wrong, <strong>retry generation once</strong>, then surface an error to the user.</li>
+<li><strong>Pixel grid detection</strong> (<code>pixel/grid.ts</code>): estimate the pixel pitch per pose by edge-to-gridline alignment (sprite-gen <code>detect_pixel_pitch</code>) and take the median. This gives <code>logicalHeight</code>, the character's height in real pixels, typically 40–64.</li>
+<li><strong>Snap</strong> each pose to its logical grid: dominant colour per block, binarized alpha.</li>
+<li><strong>Palette lock:</strong> median-cut over all sheet poses to <code>paletteSize</code> (default 24) gives <code>characters.palette_json</code>. <strong>Every later frame is quantized to this palette.</strong> This one rule removes most of the frame-to-frame colour flicker.</li>
+<li>Save each pose as an anchor PNG (<code>anchors_json</code>), both at logical resolution and as an 8× nearest-neighbour upscale. The upscale is the reference we attach to strip prompts (models read big crisp pixels better).</li>
+</ol>
+<h3 id="54-d-action-plan">5.4 (D) Action plan</h3>
+<p>The default actions use <strong>presets</strong> (<code>pipeline/presets.ts</code>, no LLM call) with hand-written per-frame pose descriptions. Example for <code>walk</code>:</p>
+<pre><code class="language-ts">walk: {
+  frames: 6, fps: 10, playback: 'loop', canvas: 'standard',
+  poses: [
+    'contact: right foot forward heel down, left foot back, arms opposite',
+    'down: weight on right leg, body lowest',
+    'passing: left leg passes right, body highest',
+    'contact: left foot forward heel down, right foot back',
+    'down: weight on left leg, body lowest',
+    'passing: right leg passes left, body highest',
+  ],
+}
+</code></pre>
+<p>Chat-created actions get their plan from the agent (§7.3). The schema is identical.</p>
+<p><strong>Canvas shapes:</strong> <code>standard</code> (cell 1:1.25), <code>wide</code> (attacks with weapon reach or effects, 1.75:1.25), <code>tall</code> (big vertical poses, 1:1.75). The planner picks one, and the shape drives the layout guide and the cell size of that action.</p>
+<h3 id="55-e-strip-generation-the-atlas-row">5.5 (E) Strip generation: the atlas row</h3>
+<ul>
+<li><strong>One image call = one horizontal strip</strong> of up to <code>MAX_FRAMES_PER_STRIP</code> frames, 6 by default. sprite-gen's validation found that 4–6 is stable and that 9+ causes duplicates and merged poses.</li>
+<li><strong>More frames needed?</strong> Split into segments of ≤6 and generate them <strong>sequentially</strong>. Segment <em>k</em> gets the references <code>[anchor, layout_guide_k, last frame(s) of segment k-1]</code>, plus prompt text giving its frame range ("frames 7–12 of 12, continuing from the attached previous frames"). After processing, the segments are concatenated into one logical row. Different actions and directions run <strong>in parallel</strong>, limited by <code>CHAR2D_MAX_PARALLEL_IMAGE_JOBS</code>.</li>
+<li><strong>Layout guide</strong> for the strip: <code>frames × cellW</code> by <code>cellH</code> (scaled to the model's allowed size), with invisible slots, a baseline, and safe margins.</li>
+<li><strong>References:</strong> <code>[direction anchor (8×), layout guide, (optional) previous segment]</code>. <strong>Never the original upload</strong> (identity rule).</li>
+<li><strong>Prompt template</strong> (<code>pipeline/prompts/strip.ts</code>, adapted from sprite-gen <code>row_prompt</code>):
+  <pre><code>Create a single horizontal sprite strip of exactly {N} frames for the character in the attached
+anchor image, facing {direction}, performing &quot;{label}&quot;: {plan.summary}.
+Frame-by-frame poses (left to right):
+1. {pose1} … N. {poseN}
+Rules:
+- Identity lock: copy face, hair, outfit, colors, outline weight, proportions and accessories
+  exactly from the anchor. This strip owns motion only.
+- Animate IN PLACE: feet stay on the same baseline unless the pose is airborne; the character does
+  not travel across the strip. Same scale in every frame.
+- One pose per invisible slot of the attached layout guide; poses never touch or overlap; keep
+  padding inside each slot.
+- Effects (slashes, sparks, dust) only if listed in the pose text, and they must stay inside the
+  same slot and touch the character.
+- Same pixel-art style as the anchor: crisp square pixels, ~24 colors, 1px dark outline,
+  no anti-aliasing, no motion blur.
+- Background: perfectly flat solid {key}; never use {key} on the character.</code></pre></li>
+<li><strong>Mirroring:</strong> if <code>mirrorLeft</code>, the <code>left</code> direction is produced in post by <code>flipX</code> on processed frames. No image call.</li>
+</ul>
+<h3 id="56-f-strip-processing-deterministic-pipelineprocessts">5.6 (F) Strip processing (deterministic, <code>pipeline/process.ts</code>)</h3>
+<ol>
+<li>Chroma removal (as in §5.3).</li>
+<li>Component extraction → exactly N poses. On a count mismatch, try <code>projection</code> segmentation (sprite-gen <code>separate_fused_poses</code>: a vertical cut at minimum-cost projection). If that fails, the job fails with <code>extract_mismatch</code>, auto-retries generation once, then reports to the user.</li>
+<li>Pixel snap with the <strong>sheet's pitch</strong> as a hint (per-frame pitch detection with the median as fallback).</li>
+<li>Quantize to the <strong>locked character palette</strong>.</li>
+<li>Optional 1px outline (on by default for the anime pixel style).</li>
+<li><strong>Registration:</strong> align frames on the anchor point. <code>anchorX</code> = alpha-weighted centroid of the lower 30% of the body (stable feet); <code>anchorY</code> = lowest opaque row (the baseline) for grounded frames. For airborne frames (flagged in the plan), keep the vertical offset relative to frame 1's baseline so the jump pose reads correctly while physics handles the real height.</li>
+<li><strong>Fit to cell:</strong> upscale to integer scale 1× (we store <strong>logical-resolution</strong> frames; the renderer scales with nearest-neighbour). Place each frame in the action's cell (<code>cellW×cellH</code> in logical pixels, e.g. 48×60 standard) at the anchor.</li>
+<li>Basic QA flags, stored on the version and shown as warnings: empty or sparse frame, near-duplicate frames (dHash), frame-size outliers, leftover key pixels.</li>
+</ol>
+<h3 id="57-g-atlas-composition-pipelineatlasts">5.7 (G) Atlas composition (<code>pipeline/atlas.ts</code>)</h3>
+<ul>
+<li>One atlas per character. <strong>One row per (action, direction)</strong>, frames left to right. Rows use the max frame count; for wide actions the row height/width follows that action's cell. Composition uses <strong>absolute rects</strong>, so the runtime never infers a grid.</li>
+<li>Mirrored directions are <strong>not baked</strong> into the atlas. The manifest marks them <code>mirrorOf: 'right'</code> and the renderer flips them. (This keeps the atlas small; the export option can bake them.)</li>
+<li>Output: <code>atlas@1x.png</code> (logical pixels), <code>manifest.json</code>, <code>atlas_version++</code>. Runs after any action version becomes <code>ready</code> or is selected (undo/redo). It is cheap: under 50 ms for a typical character.</li>
+<li>Use <strong>sharp</strong> for PNG IO and raw RGBA buffers; all pixel algorithms work on <code>Uint8ClampedArray</code>.</li>
+</ul>
+<h3 id="58-cost-and-latency-budget-target">5.8 Cost and latency budget (target)</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Calls</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sheet</td>
+<td>1 image (+1 retry worst case)</td>
+<td></td>
+</tr>
+<tr>
+<td>Defaults (side_scroller)</td>
+<td>4 image</td>
+<td>parallel ×2 → about 2 rounds</td>
+</tr>
+<tr>
+<td>Defaults (top_down)</td>
+<td>6 image</td>
+<td></td>
+</tr>
+<tr>
+<td>New chat action</td>
+<td>1 chat + 1 image per direction per ≤6 frames</td>
+<td>e.g. attack R (+mirror) = 1 image</td>
+</tr>
+<tr>
+<td>Retime / gameplay tweak</td>
+<td>1 chat, <strong>0 image</strong></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Show a pre-run estimate ("This will make 2 image generations") in the plan card (§7.4).</p>
+<hr />
+<h2 id="6-runtime-contracts">6. Runtime contracts</h2>
+<h3 id="61-manifestjson-single-source-of-truth-for-both-renderers">6.1 <code>manifest.json</code> (single source of truth for both renderers)</h3>
+<pre><code class="language-ts">type Manifest = {
+  version: 1;
+  characterId: string;
+  viewType: 'side_scroller' | 'top_down';
+  atlas: { url: string; width: number; height: number; version: number };
+  pixelScale: number;              // suggested on-screen integer scale, e.g. 3
+  actions: Record&lt;string /*action key*/, {
+    label: string;
+    playback: 'loop' | 'once' | 'once_hold';     // once → returns to locomotion; once_hold → holds last frame while input held
+    directions: Record&lt;Direction, {
+      mirrorOf?: Direction;                       // 'left' → mirrorOf 'right'
+      frames?: { x: number; y: number; w: number; h: number;
+                 anchorX: number; anchorY: number; // feet point inside the rect
+                 durationMs: number }[];
+    }&gt;;
+    gameplay: ActionGameplay;
+    events?: { frame: number; name: 'hit' | 'footstep' | 'spawn' | string }[]; // optional hooks
+  }&gt;;
+};
+type Direction = 'right' | 'left' | 'up' | 'down';
+</code></pre>
+<p>Per-frame <code>durationMs</code> (instead of only fps) lets the AI do timing edits such as "hold the wind-up longer" with no regeneration.</p>
+<h3 id="62-phaser-adapter">6.2 Phaser adapter</h3>
+<p><code>lib/game/manifestToPhaser.ts</code> converts the manifest into a Phaser <code>TextureAtlas</code> JSON (frame names <code>&lt;action&gt;/&lt;dir&gt;/&lt;i&gt;</code>) plus <code>anims.create</code> configs with per-frame <code>duration</code>. Mirrored directions use the source frames, and the sprite sets <code>flipX</code>. The Character Maker preview reuses the same timing helpers, so both renderers stay identical.</p>
+<h3 id="63-character-controller-state-machine-libgamecontrollerts">6.3 Character controller state machine (<code>lib/game/controller.ts</code>)</h3>
+<p>Shared logic, unit-tested, with the world providing physics:</p>
+<pre><code>            ┌──────── locomotion layer (driven by input + physics) ────────┐
+side:       idle ⇄ walk ;  any grounded → jump (airborne) → land → idle/walk ; grounded+down → crouch
+top_down:   idle[dir] ⇄ walk[dir]  (dir = last non-zero input; diagonals pick the dominant axis)
+            └──────────────────────────────────────────────────────────────┘
+            ┌──────── action layer (custom actions, priority over locomotion) ┐
+            press  → play once, lock per gameplay.lockMovement, then return
+            hold   → loop while held (e.g. &quot;block&quot;, &quot;charge&quot;), release → return
+            toggle → enter/exit a loop state (e.g. &quot;sit&quot;)
+            └──────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="64-actiongameplay-tunable-without-regenerating-images">6.4 <code>ActionGameplay</code> (tunable without regenerating images)</h3>
+<pre><code class="language-ts">type ActionGameplay = {
+  trigger: 'press' | 'hold' | 'toggle';
+  lockMovement: boolean;              // can't steer during action
+  interruptible: boolean;
+  cooldownMs?: number;
+  rootMotion?: { dx: number; dy: number; overMs: number };  // dash / lunge, in px (logical)
+  // locomotion-only:
+  moveSpeed?: number;                 // walk px/s
+  jumpVelocity?: number; gravityScale?: number;  // jump
+  crouchSpeedMultiplier?: number;
+};
+</code></pre>
+<p>"Make the jump floatier" becomes <code>gravityScale: 0.7</code> plus longer airborne frame durations. That is <strong>zero image calls</strong>.</p>
+<h3 id="65-input-bindings">6.5 Input bindings</h3>
+<ul>
+<li>Use <code>KeyboardEvent.code</code> (layout-independent) and the Gamepad API (<code>navigator.getGamepads()</code>, standard mapping).</li>
+<li><strong>Default profiles</strong></li>
+<li>side_scroller P1: <code>A/D</code> move, <code>W</code> or <code>Space</code> jump, <code>S</code> crouch. P2: <code>←/→</code>, <code>↑</code>, <code>↓</code>.</li>
+<li>top_down P1: <code>WASD</code>. P2: arrow keys.</li>
+<li>Custom actions: auto-assign the first free key from <code>J K L U I O</code> (P1) or <code>Numpad1-6</code> (P2); the user can change it.</li>
+<li>Gamepad: D-pad/left stick move, A = jump, B = crouch, X/Y/LB/RB = custom actions.</li>
+<li><strong>Binding UI:</strong> each action chip has a key badge. Clicking it opens a "Press a key…" capture modal (Esc cancels, Backspace clears). Conflicts within a profile show inline: "J is already used by <em>Fireball</em>: swap?".</li>
+<li>Bindings are stored per character per profile. The Playground resolves them when you assign a character to P1/P2.</li>
+</ul>
+<hr />
+<h2 id="7-chat-agent-adjust-vs-create">7. Chat agent (adjust vs create)</h2>
+<h3 id="71-responsibilities">7.1 Responsibilities</h3>
+<p>Given the user's message, the character context, and the chat history, the agent must:
+1. <strong>Classify intent:</strong> <code>create_action</code> · <code>adjust_action</code> (visual regen) · <code>retime_action</code> / <code>tune_gameplay</code> (no regen) · <code>rebind</code> · <code>rename/delete</code> · <code>question/other</code>.
+2. <strong>Resolve the target</strong> for an adjust: match against existing action keys and labels ("the jump", "that attack I just made", the most recently edited action when the message is ambiguous).
+3. <strong>Plan:</strong> frames, per-frame pose text, durations, canvas, playback, directions, gameplay params, effects.
+4. <strong>Act:</strong> call tools to queue jobs and update rows.
+5. <strong>Reply</strong> briefly in plain language, including what will be generated and the cost.</p>
+<h3 id="72-tools-json-schema-validated-by-zod-server-side">7.2 Tools (JSON-schema, validated by zod server-side)</h3>
+<pre><code class="language-ts">get_character()                       // view type, actions (key, label, frames, durations, gameplay, bindings)
+create_action({ key, label, icon, directions, plan: ActionPlan, gameplay, binding?: {code, trigger} })
+adjust_action({ actionKey, mode: 'regenerate' | 'regenerate_frames',
+                plan: ActionPlan, frameIndices?: number[], note: string })
+retime_action({ actionKey, durationsMs: number[] | { fps: number }, playback? })
+tune_gameplay({ actionKey, patch: Partial&lt;ActionGameplay&gt; })
+set_binding({ actionKey, code, trigger, profile? })
+rename_action({ actionKey, label }) / delete_action({ actionKey })   // delete requires confirm
+</code></pre>
+<p>Rules in the system prompt:
+- Use a no-image tool (<code>retime_action</code>, <code>tune_gameplay</code>) whenever the request can be met by timing or physics alone.
+- Keep the default actions' keys; the agent may adjust but not delete them.
+- Never put displacement in the poses (in-place rule). Put movement in <code>gameplay.rootMotion</code>.
+- Frame budget: 2–6 frames for most actions; &gt;6 only when the user asks for "smooth/long", which triggers multi-strip generation.
+- Respect the view type: in top_down, a new action needs <code>down, up, right</code> (with left mirrored) unless it is a non-directional effect such as an emote ("only down").
+- Ask a clarifying question <strong>only</strong> when the target is truly ambiguous (two equally likely actions).</p>
+<h3 id="73-actionplan-schema">7.3 <code>ActionPlan</code> schema</h3>
+<pre><code class="language-ts">type ActionPlan = {
+  summary: string;                      // one line for prompt + UI
+  frames: number;                       // total, may exceed 6 → multi-strip
+  poses: string[];                      // length === frames, concrete body positions
+  durationsMs: number[];                // length === frames
+  playback: 'loop' | 'once' | 'once_hold';
+  canvas: 'standard' | 'wide' | 'tall';
+  airborneFrames?: number[];            // registration hint (§5.6)
+  effects?: string;                     // e.g. &quot;blue crescent slash arc in frames 3–4, attached to blade&quot;
+  events?: { frame: number; name: string }[];
+};
+</code></pre>
+<h3 id="74-chat-ux">7.4 Chat UX</h3>
+<ul>
+<li>Messages stream in. When the agent calls a generating tool, it posts a <strong>Plan card</strong> in the chat: action name, frame thumbnails as text pose lines, a timing bar, the estimated number of image calls, and <strong>[Generate] [Edit plan] [Cancel]</strong>. Default: auto-generate for changes with ≤2 image calls. Bigger changes need a click (this is a setting).</li>
+<li>During generation the action chip shows a progress ring. Stage overlay: "Generating strip 1/2 → Processing → Ready".</li>
+<li>When ready, the new version auto-plays on stage, and the chip gets a version dropdown (v1, v2, …) for <strong>undo/redo</strong> (<code>active_version_id</code>).</li>
+<li>Example routings:
+  | User says | Intent | Image calls |
+  |---|---|---|
+  | "make walking faster" | <code>tune_gameplay(moveSpeed↑)</code> + <code>retime_action(fps↑)</code> | 0 |
+  | "the jump should be floatier" | <code>tune_gameplay(gravityScale↓)</code> + retime the airborne frames longer | 0 |
+  | "add a sword slash on J" | <code>create_action(attack_slash, wide, 5 frames)</code> + binding | 1 |
+  | "the slash should have a fire trail" | <code>adjust_action(regenerate)</code> with effects | 1 |
+  | "fast forward dash" | <code>create_action(dash, 4 frames, rootMotion dx=96 overMs=200)</code> | 1 |
+  | "frame 3 of the crouch looks broken" | <code>adjust_action(regenerate_frames [2])</code>* | 1 |</li>
+</ul>
+<p><em><code>regenerate_frames</code> regenerates the whole strip, using the current strip as a motion reference with the instruction to change only frame k. The pipeline then </em><em>splices in only the requested frame indices</em>* and keeps the others.</p>
+<h3 id="75-agent-implementation">7.5 Agent implementation</h3>
+<ul>
+<li><code>src/server/ai/agent.ts</code>: a loop of at most 4 turns: model call → execute tool calls → feed results back → final text. Persist every message and tool call in <code>chat_messages</code>.</li>
+<li>Context sent each turn: the system prompt, a compact JSON summary of the character (not images), and the last 20 messages. If Muse chat accepts images, attach the current sheet anchor for visual questions.</li>
+<li>Route: <code>POST /api/characters/:id/chat</code> streams the response (SSE/ReadableStream). Job progress comes through <code>/api/events</code>.</li>
+</ul>
+<hr />
+<h2 id="8-api-surface-next-route-handlers-runtime-nodejs">8. API surface (Next route handlers, <code>runtime = 'nodejs'</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Route</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST</td>
+<td><code>/api/characters</code></td>
+<td>multipart: image, name, description, viewType → creates character, queues <code>sheet</code> job</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/characters</code></td>
+<td>gallery list</td>
+</tr>
+<tr>
+<td>GET/PATCH/DELETE</td>
+<td><code>/api/characters/:id</code></td>
+<td>detail incl. manifest, actions, bindings; rename; delete (removes assets)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/characters/:id/sheet/accept</code></td>
+<td>accept sheet → queues default action jobs</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/characters/:id/sheet/regenerate</code></td>
+<td><code>{note?}</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/characters/:id/actions</code></td>
+<td>list with versions</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/characters/:id/actions/:key/versions/:vid/activate</code></td>
+<td>undo/redo</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/api/characters/:id/actions/:key</code></td>
+<td>manual retime, gameplay, label, playback</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/characters/:id/actions/:key/regenerate</code></td>
+<td>manual re-roll</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/api/characters/:id/bindings</code></td>
+<td>replace binding set (validated, conflict-checked)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/characters/:id/chat</code></td>
+<td>streaming agent turn</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/characters/:id/chat</code></td>
+<td>history</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/events?characterId=</code></td>
+<td>SSE job progress</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/assets/:id</code></td>
+<td>file stream, immutable cache headers (content-addressed)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/api/characters/:id/export</code></td>
+<td>zip: atlas, manifest, phaser json, gifs</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/api/settings/health</code></td>
+<td>Muse key present + test call</td>
+</tr>
+</tbody>
+</table>
+<p>Validate every input with zod. Upload limits: ≤10 MB; png/jpg/webp. Decode with sharp to strip metadata.</p>
+<hr />
+<h2 id="9-frontend">9. Frontend</h2>
+<h3 id="91-stack">9.1 Stack</h3>
+<ul>
+<li>Next.js App Router, React 19, TypeScript strict.</li>
+<li><strong>Tailwind CSS v4</strong> with design tokens (§10) as CSS variables. Hand-made components; no heavy UI kit. Radix primitives (Dialog, Tooltip, DropdownMenu) for accessibility.</li>
+<li><strong>TanStack Query</strong> for server state, with SSE events invalidating queries. <strong>Zustand</strong> for local stage/playground state.</li>
+<li><strong>Phaser 3</strong> loaded only on <code>/playground</code> via <code>next/dynamic</code> with <code>ssr:false</code>.</li>
+</ul>
+<h3 id="92-pages-and-layout">9.2 Pages and layout</h3>
+<p><strong><code>/</code> Home:</strong> logo hero, "Create character" CTA, and a gallery grid of character cards (idle animation looping on hover, view-type badge).</p>
+<p><strong><code>/create</code> Wizard (3 steps):</strong>
+1. Upload (drag-drop, paste, camera on mobile) with a preview.
+2. View type: two big illustrated cards, <strong>Side-scroller</strong> (shows "← → Jump Crouch") and <strong>Top-down</strong> (shows "↑ ↓ ← →"), plus name/description and an advanced drawer (pixel height 48/64, palette size, mirror left/right).
+3. Sheet generation: a progress animation (pixel sparkles from the logo), then the review gate (§5.2).</p>
+<p><strong><code>/characters/[id]</code> Character Maker</strong></p>
+<pre><code>┌───────────────────────────────────────────────────────────────────────────────┐
+│ [logo]  Char2D      ‹Character name ✎›   view: Side-scroller   [Export] [▶ Play]│
+├──────────────┬───────────────────────────────────────────────┬────────────────┤
+│ ACTIONS      │                                               │ INSPECTOR      │
+│ ▸ Idle   [—] │               ╔═════════════╗                 │ Action: Walk   │
+│ ▸ Walk  [A/D]│               ║   (sprite)  ║  ← stage, bg    │ Version v2 ▾   │
+│ ▸ Jump   [W] │               ╚═════════════╝    toggles      │ Frames ▮▮▮▮▮▮  │
+│ ▸ Crouch [S] │   ◀ ▶ facing   ⏯  0.5× 1× 2×  onion ☐         │ Timing bar     │
+│ ▸ Slash  [J] │   ───●──────── frame scrubber 3/6             │ Playback loop ▾│
+│ + New action │                                               │ Gameplay sliders│
+│              │                                               │ Binding [J] ✎  │
+├──────────────┴───────────────────────────────────────────────┴────────────────┤
+│ 💬 chat history (collapsible drawer, plan cards inline)                         │
+│ [ Ask to adjust or add an action… e.g. &quot;add a spinning kick on K&quot;     ] [Send ▶]│
+└───────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<ul>
+<li>The stage canvas renders with <code>imageSmoothingEnabled = false</code> at integer scale, auto-fit. It listens to bound keys while focused, so you can test-drive the bindings: in the Maker, keys trigger animations only (no physics).</li>
+<li>Clicking an action chip plays it once (or loops it if it is a loop). Each chip shows a status ring and QA warning icons.</li>
+<li>The timing bar is a draggable per-frame duration editor that saves via PATCH with no AI.</li>
+<li>The chat drawer opens when you focus the input. Suggestion chips show the view's common requests ("Add attack", "Make walk faster", "Add dash").</li>
+</ul>
+<p><strong><code>/playground</code></strong>
+- Top bar: a <strong>World switcher</strong> with two tabs, <em>Side-scroller</em> and <em>Top-down</em>. The incompatible tab is disabled with a tooltip ("No top-down characters yet").
+- Left panel: compatible characters. Drag them into the world, or use "Add". Assign <strong>P1 / P2 / NPC</strong>. <code>Tab</code> cycles which character P1 controls.
+- An on-screen key legend shows each player's bindings. A touch D-pad and buttons appear on coarse pointers.
+- Phaser scene features:
+  - <strong>SideScrollerScene:</strong> a 3-screen-wide level built from a code-generated tile map (ground, floating platforms, a pit), parallax background (2–3 layers), Arcade physics with gravity, camera follow with deadzone and world bounds, coyote time 80 ms and jump buffer 100 ms (feel), crouch reducing the hitbox height.
+  - <strong>TopDownScene:</strong> a 40×30 tile map (grass, paths, trees, water as colliders), 4-dir movement with normalized diagonals, y-sort depth, camera follow, simple collision.
+  - Both scenes: characters are scaled so their <code>logicalHeight</code> maps to about 1.5 tiles. Shadows are ellipse sprites under the feet. Custom actions run <code>rootMotion</code> as a tween/velocity override.
+- World art: ship a small <strong>CC0 pixel tileset</strong> in <code>public/worlds/</code> (e.g., a Kenney pack; check its license and credit it in NOTICE) recolored toward the brand palette. The worlds must not need AI generation to run.</p>
+<h3 id="93-shared-front-end-modules">9.3 Shared front-end modules</h3>
+<pre><code>src/lib/manifest.ts        types + zod schema (shared with server)
+src/lib/anim/timeline.ts   frame-at-time helpers (used by SpritePlayer + tests)
+src/components/SpritePlayer.tsx
+src/lib/game/controller.ts state machine (pure, unit-tested)
+src/lib/game/input.ts      keyboard/gamepad → per-profile intent
+src/lib/game/manifestToPhaser.ts
+src/game/scenes/{SideScrollerScene,TopDownScene,Boot}.ts
+</code></pre>
+<hr />
+<h2 id="10-ui-and-visual-design-matching-the-logo">10. UI and visual design (matching the logo)</h2>
+<p>The look is a <strong>bright, clean, "pixel-cute"</strong> interface: a white or very light canvas, the logo's <strong>blue → cyan → teal → green</strong> gradient as the hero accent, chunky pixel details (stepped corners, pixel sparkles "✚"), and rounded, friendly type. Think of a modern creative tool wearing pixel-art clothing, not a dark retro arcade.</p>
+<h3 id="101-tokens-sampled-from-the-logo">10.1 Tokens (sampled from the logo)</h3>
+<pre><code class="language-css">:root {
+  /* brand gradient stops (logo wordmark, left→right) */
+  --c2d-blue-700: #0456F8;   /* deep &quot;C&quot; */
+  --c2d-blue-500: #0F7DF8;
+  --c2d-sky-400:  #0BA4F1;
+  --c2d-cyan-400: #09BFD7;
+  --c2d-teal-400: #20CBA0;   /* mid wordmark / hair highlight #20E1C6 */
+  --c2d-green-500:#34BE69;
+  --c2d-lime-400: #73D945;   /* &quot;D&quot; top / sparkles */
+  --c2d-navy-800: #1740B4;   /* mascot outline/shadow → text-strong on light */
+  --c2d-gold-400: #F5B623;   /* belt buckle accent — use sparingly (warnings, coins) */
+
+  --grad-brand: linear-gradient(90deg, #0456F8 0%, #0BA4F1 35%, #20CBA0 65%, #73D945 100%);
+
+  /* surfaces (light, default) */
+  --bg:        #F7FBFF;      /* near-white with blue tint */
+  --surface:   #FFFFFF;
+  --surface-2: #EEF6FF;
+  --border:    #D4E4F7;
+  --text:      #0E1B3D;
+  --text-muted:#5B6B8C;
+  --focus:     #0BA4F1;
+  --danger:    #F0475C;
+}
+/* dark mode: --bg #0B1430, --surface #111D42, --surface-2 #182756, --border #24376E,
+   --text #EAF3FF, --text-muted #9DB0D9; brand stops unchanged */
+</code></pre>
+<h3 id="102-typography">10.2 Typography</h3>
+<ul>
+<li>Display/headings: <strong>Fredoka</strong> (rounded geometric, close to the "Char2D" wordmark).</li>
+<li>Pixel accents (key badges, frame counters, world names, button labels in the Playground): <strong>Pixelify Sans</strong> (more readable than Press Start 2P). Use it for short strings only.</li>
+<li>Body/UI text: <strong>Nunito</strong>.</li>
+<li>Load all three through <code>next/font/google</code> (self-hosted at build time, so no runtime CDN).</li>
+</ul>
+<h3 id="103-components-and-motifs">10.3 Components and motifs</h3>
+<ul>
+<li><strong>Pixel buttons:</strong> solid brand-gradient fill, 2px navy "pixel" border made with stepped <code>box-shadow</code> corners (no border-radius on primary buttons), and a 2px press-down offset on <code>:active</code>. Secondary buttons are white with a navy pixel border.</li>
+<li><strong>Cards and panels:</strong> white, 12px radius, 1px <code>--border</code>, with a soft blue shadow <code>0 4px 0 #D4E4F7</code> (a flat, pixel-ish drop).</li>
+<li><strong>Key badges:</strong> small keycaps rendered in Pixelify Sans, <code>[J]</code>, with a 2px bottom "keycap" shadow.</li>
+<li><strong>Sparkles:</strong> the logo's ✚ pixel crosses as a decorative SVG sprite. They twinkle around the stage on generation success, and an idle field fades in on loading states.</li>
+<li><strong>Stage:</strong> a light checkerboard by default (<code>#EEF6FF</code> / <code>#FFFFFF</code>), plus options for a "grass" strip, "sky", and dark.</li>
+<li><strong>Progress:</strong> a pixel progress bar filled with the brand gradient in 8 px steps.</li>
+<li><strong>Iconography:</strong> 16×16 pixel icons (play, pause, flip, onion, gamepad), drawn as SVG <code>&lt;rect&gt;</code>s so they stay crisp at any scale.</li>
+<li><strong>Motion:</strong> a 150–200 ms ease-out on UI transitions. Respect <code>prefers-reduced-motion</code> by turning off sparkles and the bounce.</li>
+<li><strong>Accessibility:</strong> contrast ≥ 4.5:1 for text. The gradient is used only on large text and fills, with white text on blue/teal and navy text on green/lime. Use <code>:focus-visible</code> rings. Every control has a keyboard path, and the key-capture modal is screen-reader labelled.</li>
+</ul>
+<p>Copy <code>media/logo.jpeg</code> to <code>public/brand/</code> and make a transparent PNG/SVG variant, plus a favicon from the mascot head.</p>
+<hr />
+<h2 id="11-repository-layout">11. Repository layout</h2>
+<pre><code>char2d/
+├─ README.md                  quick start, screenshots, Muse setup, credits
+├─ LICENSE (Apache-2.0)       NOTICE  ← sprite-gen attribution + tileset credits
+├─ .env.example
+├─ package.json               scripts below
+├─ drizzle.config.ts
+├─ data/                      (gitignored) char2d.db, assets/
+├─ public/brand/, public/worlds/, public/fonts?
+├─ src/
+│  ├─ app/
+│  │  ├─ page.tsx, create/, characters/[id]/, playground/, settings/
+│  │  └─ api/… (route handlers, §8)
+│  ├─ components/             ui/ (Button, Panel, KeyBadge, Sparkles…), maker/, playground/
+│  ├─ lib/                    manifest, anim, game (shared client+server pure code)
+│  ├─ game/scenes/            Phaser scenes
+│  ├─ server/
+│  │  ├─ db/ (schema.ts, migrate.ts, repo/*.ts)
+│  │  ├─ ai/ (types.ts, muse.ts, agent.ts, tools.ts, prompts/system.ts)
+│  │  ├─ pipeline/ (guides.ts, presets.ts, sheet.ts, strip.ts, process.ts, atlas.ts, export.ts, prompts/)
+│  │  ├─ pixel/ (chroma.ts, components.ts, segment.ts, grid.ts, snap.ts, palette.ts, outline.ts, register.ts, qa.ts)
+│  │  ├─ jobs/ (queue.ts, handlers/*.ts, events.ts)
+│  │  └─ storage/ (assets.ts)
+│  └─ worker/index.ts
+├─ tests/                     vitest unit (pixel/*, controller, timeline, manifest), fixtures/*.png
+└─ e2e/                       Playwright: create (with mocked Muse) → maker → playground
+</code></pre>
+<p><code>package.json</code> scripts:</p>
+<pre><code class="language-json">{
+  &quot;dev&quot;: &quot;concurrently -n web,worker \&quot;next dev\&quot; \&quot;tsx watch src/worker/index.ts\&quot;&quot;,
+  &quot;build&quot;: &quot;next build&quot;,
+  &quot;start&quot;: &quot;concurrently -n web,worker \&quot;next start\&quot; \&quot;tsx src/worker/index.ts\&quot;&quot;,
+  &quot;db:generate&quot;: &quot;drizzle-kit generate&quot;,
+  &quot;test&quot;: &quot;vitest&quot;,
+  &quot;e2e&quot;: &quot;playwright test&quot;,
+  &quot;lint&quot;: &quot;eslint . &amp;&amp; tsc --noEmit&quot;
+}
+</code></pre>
+<p>Requirements: Node ≥ 20. <code>better-sqlite3</code> and <code>sharp</code> ship prebuilt binaries for macOS, Linux, and Windows, so there are no system dependencies. Migrations run automatically at worker and web start (<code>migrate()</code> guarded by a file lock).</p>
+<p><strong>Mock mode:</strong> <code>CHAR2D_FAKE_AI=1</code> swaps Muse for a fixture provider that returns canned sheets and strips from <code>tests/fixtures/</code>. Contributors can run the whole app and the e2e tests without a key, which matters for an open-source repo.</p>
+<hr />
+<h2 id="12-porting-notes-from-sprite-gen-what-to-take-what-to-skip">12. Porting notes from sprite-gen (what to take, what to skip)</h2>
+<table>
+<thead>
+<tr>
+<th>sprite-gen piece</th>
+<th>Char2D</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sprite-request.json</code> numeric SSoT</td>
+<td><code>characters.style_json</code> + <code>ActionPlan</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>prepare.draw_guide</code> layout guides</td>
+<td>Port</td>
+<td><code>pipeline/guides.ts</code></td>
+</tr>
+<tr>
+<td><code>row_prompt</code> (identity lock, slot rules, anchor ownership)</td>
+<td>Port and simplify</td>
+<td><code>pipeline/prompts/strip.ts</code></td>
+</tr>
+<tr>
+<td>Idle-anchor ownership (base used only pre-anchor)</td>
+<td>Keep as a hard rule</td>
+<td>§5.2</td>
+</tr>
+<tr>
+<td><code>remove_chroma_background</code> (unmix, despill)</td>
+<td>Port</td>
+<td><code>pixel/chroma.ts</code></td>
+</tr>
+<tr>
+<td><code>--chroma-key auto</code></td>
+<td>Port</td>
+<td><code>pixel/chroma.ts</code></td>
+</tr>
+<tr>
+<td><code>connected_components</code> / <code>extract_component_frames</code></td>
+<td>Port</td>
+<td><code>pixel/components.ts</code></td>
+</tr>
+<tr>
+<td><code>separate_fused_poses</code> (projection DP)</td>
+<td>Port (fallback only)</td>
+<td><code>pixel/segment.ts</code></td>
+</tr>
+<tr>
+<td>pixel-unfake: pitch detect, phase snap, dominant color, alpha binarize</td>
+<td>Port the core; skip runlen crosscheck v1</td>
+<td><code>pixel/grid.ts</code>, <code>pixel/snap.ts</code></td>
+</tr>
+<tr>
+<td><code>build_shared_palette</code> / <code>apply_palette</code></td>
+<td>Port, but lock the palette from the <strong>sheet</strong></td>
+<td><code>pixel/palette.ts</code></td>
+</tr>
+<tr>
+<td><code>enforce_outline</code>, <code>register_row_frames</code></td>
+<td>Port</td>
+<td><code>pixel/outline.ts</code>, <code>pixel/register.ts</code></td>
+</tr>
+<tr>
+<td><code>manifest.json.frame_layout</code> absolute rects</td>
+<td>Same idea, our schema</td>
+<td>§6.1</td>
+</tr>
+<tr>
+<td>Frame-count guidance (4–6 stable)</td>
+<td><code>MAX_FRAMES_PER_STRIP = 6</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Curation webview, breathing, recolor, video pipeline, scene renderer, providers codex/grok</td>
+<td><strong>Skip for v1</strong> (the video→loop pipeline is a v2 idea if Muse offers video)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Port approach: read the Python, write TS with the same function names and comments that cite the source file, and build <strong>golden tests</strong>: run sprite-gen on 3–4 fixture strips and assert that our TS output matches within a tolerance (frame count, bboxes ±1 px, palette size).</p>
+<hr />
+<h2 id="13-milestones">13. Milestones</h2>
+<p>Each phase is shippable on its own and comes with acceptance criteria.</p>
+<p><strong>Phase 0: Skeleton (2–3 days)</strong>
+- Next app, Tailwind tokens, fonts, logo, layout shell; Drizzle schema plus auto-migrate; worker plus job queue plus SSE; asset storage; <code>CHAR2D_FAKE_AI</code> provider.
+- <span class="ok">✔</span> <code>npm i &amp;&amp; npm run dev</code> on a fresh clone shows the home page. A fake job's progress shows up in the browser.</p>
+<p><strong>Phase 1: Muse and sheet (3–4 days)</strong>
+- MuseClient (chat + image) with health check, the §3.1 capability spike (write the findings into <code>docs/muse.md</code>), the create wizard, sheet generation, chroma key, components, grid detect, palette lock, and the review gate.
+- <span class="ok">✔</span> An uploaded anime image produces an accepted pixel sheet with 3 clean transparent anchors on ≥4 of 5 test images.</p>
+<p><strong>Phase 2: Strips and atlas (4–5 days)</strong>
+- Presets, strip generation, multi-strip segments, processing (snap, palette, outline, register), atlas plus manifest, mirroring, QA flags.
+- <span class="ok">✔</span> Both view types generate all default actions automatically. The manifest validates. The frames show no visible key fringe, the palette stays consistent, and the feet don't jitter in idle/walk.</p>
+<p><strong>Phase 3: Character Maker (4–5 days)</strong>
+- SpritePlayer, stage controls, action list, inspector (timing bar, gameplay sliders, versions), binding editor with conflict detection, keyboard test-drive.
+- <span class="ok">✔</span> Every default action plays from both chips and keys. Retiming persists. Undo/redo between versions works.</p>
+<p><strong>Phase 4: Chat agent (4–5 days)</strong>
+- Agent loop, tools, plan card, streaming, intent routing, <code>regenerate_frames</code> splicing.
+- <span class="ok">✔</span> All six example prompts in §7.4 route to the intended tools in a scripted eval (<code>tests/agent.eval.ts</code>, run against Muse with recorded fixtures). "Add X on K" produces a new action bound to K.</p>
+<p><strong>Phase 5: Playground (5–6 days)</strong>
+- Phaser boot, manifest → atlas, controller state machine, both worlds, compatibility gating, multi-character P1/P2/NPC, gamepad, touch controls.
+- <span class="ok">✔</span> A side-scroller character runs, jumps, and crouches across platforms; a top-down character walks in 4 directions with y-sort; the incompatible world is disabled; two characters play at once on separate key profiles; custom actions fire from their bindings.</p>
+<p><strong>Phase 6: Polish and open-source release (3 days)</strong>
+- Export zip and GIFs, README with GIFs, CONTRIBUTING, e2e in CI (GitHub Actions, fake AI), error states, empty states, dark mode, reduced motion.
+- <span class="ok">✔</span> A fresh clone passes <code>npm test &amp;&amp; npm run e2e</code> with no API key.</p>
+<p>Total: about 5–6 weeks for one full-stack developer, or about 3 weeks for two, split as (pipeline + AI) and (UI + game).</p>
+<hr />
+<h2 id="14-testing-strategy">14. Testing strategy</h2>
+<ul>
+<li><strong>Unit (vitest):</strong> every <code>pixel/*</code> function on small synthetic images (a known pitch, a known key, fused blobs), <code>timeline</code>, the <code>controller</code> state machine (table-driven input → state), manifest zod round-trips, and binding conflict logic.</li>
+<li><strong>Golden:</strong> fixture strips → processed frames compared to committed PNGs, with a per-pixel tolerance.</li>
+<li><strong>Agent eval:</strong> about 20 scripted user prompts → expected tool + key args (fuzzy). Run it manually against real Muse before releases and in CI against recorded responses.</li>
+<li><strong>E2E (Playwright, fake AI):</strong> create → accept sheet → defaults ready → add an action via chat → bind → open the playground → press keys → assert the animation name on the Phaser sprite (expose <code>window.__char2d</code> debug hooks in dev/test builds only).</li>
+</ul>
+<hr />
+<h2 id="15-risks-and-mitigations">15. Risks and mitigations</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Muse lacks reference-image conditioning, or it is weak</td>
+<td>The Phase 1 spike happens first. If it is weak, strengthen the prompt with explicit appearance text auto-extracted from the sheet by the chat model (vision), and offer "regenerate". This is a known blocker; escalate early.</td>
+</tr>
+<tr>
+<td>Identity drift between strips</td>
+<td>Sheet-anchor-only references, a locked palette, the identity-lock prompt block, and pixel snap. The user can re-roll one action without touching the others.</td>
+</tr>
+<tr>
+<td>The model ignores the frame count or poses fuse</td>
+<td>Layout guide, component extraction plus projection fallback, auto-retry once, then a clear error with a "re-roll" button.</td>
+</tr>
+<tr>
+<td>Walk cycles look stiff or wrong</td>
+<td>6-frame preset poses, timing editable without regeneration. Label walk as "best-effort" in QA, which matches sprite-gen's experience.</td>
+</tr>
+<tr>
+<td>Jitter between frames</td>
+<td>Feet-anchor registration plus integer placement.</td>
+</tr>
+<tr>
+<td>Long waits</td>
+<td>Parallel strips, SSE progress, the sheet gate first so failures happen early, and an option to play partial results (idle is ready before walk).</td>
+</tr>
+<tr>
+<td>SQLite contention between the two processes</td>
+<td>WAL mode, short transactions, <code>busy_timeout=5000</code>.</td>
+</tr>
+<tr>
+<td>Licensing</td>
+<td>Code: Apache-2.0 plus sprite-gen NOTICE. Tilesets: CC0 only. Generated assets belong to the user. Follow Muse's terms in the README.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="16-open-questions-for-the-product-owner">16. Open questions for the product owner</h2>
+<ol>
+<li>"Geometric view": this plan assumes a <strong>4-direction overhead (3/4 top-down, JRPG-style)</strong> world. If true <strong>isometric</strong> (diamond tiles, diagonal facings) is required, top_down becomes 4–8 diagonal directions and the world becomes an isometric tilemap. The data model already supports it; the cost is about +3 days in Phase 5.</li>
+<li>Should one character be allowed to support <strong>both</strong> view types? That would mean generating both default sets and making both worlds available for it. This plan currently says one view type per character.</li>
+<li>Auto-generate threshold: should chat actions start generating immediately, or always show the plan card for confirmation first?</li>
+<li>Muse pricing and rate limits: these determine <code>MAX_PARALLEL_IMAGE_JOBS</code> and whether to show cost estimates in currency.</li>
+</ol></main>
+</div>
+<script>
+document.querySelectorAll('main table').forEach(t => {
+  const w = document.createElement('div'); w.className = 'table-wrap';
+  t.parentNode.insertBefore(w, t); w.appendChild(t);
+});
+const root = document.documentElement, btn = document.querySelector('.theme-btn');
+try { const s = localStorage.getItem('c2d-theme'); if (s) root.dataset.theme = s; } catch (e) {}
+btn.addEventListener('click', () => {
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark'
+    : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  try { localStorage.setItem('c2d-theme', root.dataset.theme); } catch (e) {}
+});
+const links = [...document.querySelectorAll('nav.toc a')];
+const obs = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting) links.forEach(a => a.classList.toggle('active', a.hash === '#' + e.target.id));
+}), { rootMargin: '0px 0px -70% 0px' });
+document.querySelectorAll('main h2[id]').forEach(h => obs.observe(h));
+</script>
+</body>
+</html>
