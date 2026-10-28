@@ -27,7 +27,7 @@ Next.js · React · TypeScript · SQLite · Phaser · Muse API
 > 🚧 Work in progress. Setup instructions coming soon.
 
 ```bash
-git clone <repo-url> char2d && cd char2d
+git clone https://github.com/zeroweight-ai/Char2D.git && cd Char2D
 npm install
 cp .env.example .env.local   # add your Muse API key
 npm run dev
