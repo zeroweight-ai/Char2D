@@ -1,0 +1,1 @@
+export default function PlaygroundPage() { return <><span className="eyebrow">Playground</span><h1>A place for your pixels.</h1><section className="panel"><h2>Worlds are coming in Phase 5</h2><p>The planned side-scroller and top-down worlds will use your characters’ shared atlas manifest. Create a character once the generation workflow is available.</p></section></>; }

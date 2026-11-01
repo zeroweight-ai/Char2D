@@ -24,16 +24,29 @@ Next.js · React · TypeScript · SQLite · Phaser · Muse API
 
 ## Getting started
 
-> 🚧 Work in progress. Setup instructions coming soon.
+The repository includes the **character-sheet and default animation workflow**. Start from an uploaded image or a description, review the transparent pixel-art sheet, then accept it to generate default action strips, a sprite atlas, and an animated preview. Action editing and playground worlds are upcoming milestones.
+
+Use **Node 22 LTS** (22.18 or newer):
 
 ```bash
-git clone https://github.com/zeroweight-ai/Char2D.git && cd Char2D
 npm install
-cp .env.example .env.local   # add your Muse API key
+cp .env.example .env.local
 npm run dev
 ```
 
-See [PLAN.md](PLAN.md) for the technical design.
+Open http://localhost:3000. Fake AI is enabled by default, so no API key is needed. Click **Run demo job** to verify the worker, live progress, and asset storage.
+
+To use Muse, set `MUSE_API_KEY` and `CHAR2D_FAKE_AI=0` in `.env.local`, restart, and use **Settings → Test connection**.
+
+```bash
+npm run lint
+npm test
+npm run build
+npx playwright install chromium
+npm run e2e
+```
+
+See [setup documentation](docs/setup.md) for scripts and implementation status, [PLAN.md](PLAN.md) for the technical design, and [Muse reference](docs/muse.md) for API integration details. Local data and secrets are ignored by Git.
 
 ## Authors
 

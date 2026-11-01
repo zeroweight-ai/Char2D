@@ -1,0 +1,69 @@
+{
+  "name": "char2d",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "concurrently --kill-others -n web,worker \"next dev\" \"tsx watch --conditions=react-server src/worker/index.ts\"",
+    "dev:web": "next dev",
+    "dev:worker": "tsx watch --conditions=react-server src/worker/index.ts",
+    "build": "next build",
+    "start": "concurrently --kill-others -n web,worker \"next start\" \"tsx --conditions=react-server src/worker/index.ts\"",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx --conditions=react-server scripts/migrate.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "lint": "eslint . && tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "muse:image": "node --conditions=react-server --import tsx scripts/generate-muse-image.ts",
+    "assets:clean-empty": "node --conditions=react-server --import tsx scripts/clean-empty-assets.ts"
+  },
+  "dependencies": {
+    "next": "^15.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "@next/env": "^15.5.0",
+    "@tanstack/react-query": "^5.0.0",
+    "better-sqlite3": "^12.0.0",
+    "drizzle-orm": "^0.45.4",
+    "nanoid": "^5.0.0",
+    "phaser": "^3.90.0",
+    "server-only": "^0.0.1",
+    "sharp": "^0.35.5",
+    "zod": "^4.0.0",
+    "zustand": "^5.0.0",
+    "@fontsource/nunito": "^5.2.0",
+    "@fontsource/fredoka": "^5.2.0",
+    "@fontsource/pixelify-sans": "^5.2.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.0.0",
+    "@playwright/test": "^1.55.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "concurrently": "^9.0.0",
+    "drizzle-kit": "^0.31.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^15.5.0",
+    "postcss": "^8.0.0",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^5.0.5"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.23"
+    },
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.12"
+    }
+  }
+}

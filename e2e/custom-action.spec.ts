@@ -1,0 +1,19 @@
+import { expect,test } from "@playwright/test";
+test("adds a prompted custom action after accepting the sheet",async({page,request})=>{
+  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name:`Custom action ${Date.now()}`,description:"green knight",viewType:"side_scroller"}});
+  expect(response.status()).toBe(202);const {id}=await response.json();
+  await page.goto(`/characters/${id}`);
+  await expect(page.getByRole("button",{name:"Looks good — accept sheet"})).toBeVisible({timeout:30_000});
+  await expect(page.getByLabel("What should your character do?")).toHaveCount(0);
+  await page.getByRole("button",{name:"Looks good — accept sheet"}).click();
+  await expect(page.getByLabel("What should your character do?")).toBeVisible();
+  await page.getByLabel("What should your character do?").fill("Spin with a sword and recover to neutral");
+  await expect(page.getByLabel("Pose 1",{exact:true})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Generate custom action",exact:true})).toBeEnabled({timeout:30_000});
+  await page.getByRole("button",{name:"Generate custom action",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Custom action",exact:true})).toBeVisible({timeout:30_000});
+  await page.getByRole("button",{name:"Custom action",exact:true}).click();
+  await expect(page.getByTestId("sprite-player")).toHaveAttribute("data-action","custom_action");
+  const after=await (await request.get(`/api/characters/${id}`)).json();
+  expect(Object.keys(after.manifest.actions)).toEqual(["idle","walk","jump","crouch","custom_action"]);
+});

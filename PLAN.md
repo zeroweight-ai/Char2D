@@ -2,7 +2,7 @@
 
 > **Char2D — Pixel Character Maker.** Upload one image and get an anime-inspired pixel-art game character. Animate it through chat, map its actions to buttons, and play it in a sample world.
 >
-> Audience: the implementing developers. Status: design v1 (2026-10-28).
+> Audience: the implementing developers. Status: design v1 (2026-10-28), action constraints revised 2026-10-29.
 > Open source: clone the repo, add a Muse API key, run `npm run dev`, and it works.
 
 ---
@@ -56,7 +56,7 @@
 | top_down | `idle` | down, up, R (+mirror) | 2–4 | 6 | loop | |
 | top_down | `walk` | down, up, R (+mirror) | 4–6 | 10 | loop | covers move up/down/left/right |
 
-The defaults generate **4 strips** for side_scroller and **6 strips** for top_down, plus 1 sheet. All animation is **in place**: the character never travels inside a strip. Displacement (movement, jump height, dash distance) belongs to the game engine and is configured per action (§6.4). This is critical, because it keeps frames aligned and lets the AI tune "higher/faster" without regenerating images.
+The defaults generate **5 strips** for side_scroller and **9 strips** for top_down (walk uses two batches per direction), plus 1 sheet. All animation is **in place**: the character never travels inside a strip. Displacement (movement, jump height, dash distance) belongs to the game engine and is configured per action (§6.4). This is critical, because it keeps frames aligned and lets the AI tune "higher/faster" without regenerating images.
 
 ---
 
@@ -135,7 +135,7 @@ The pipeline depends on these. Each row lists the fallback if Muse lacks the cap
 | Needed | Why | Fallback if missing |
 |---|---|---|
 | **Reference-image input** on image gen (≥2 images) | Identity consistency: every strip is conditioned on the sheet plus the layout guide | **Blocker.** At minimum we need 1 reference image (the sheet), with the layout described in text. If there is no image input at all, quality is not viable. Escalate. |
-| Landscape output size (≈1536×1024 or wider) | Fits 4–6 frames per strip | Use square 1024 and cap strips at 4 frames, using more strips |
+| Landscape output size (≈1536×1024 or wider) | Fits up to 4 frames per strip | Use square 1024 and cap strips at 4 frames, using more strips |
 | Native transparent background | Skips chroma keying | Generate on a flat chroma key (default magenta `#FF00FF`) and key it out (§5.3). This is the default path anyway. |
 | Tool/function calling on chat | Agent loop (§7) | Use JSON-mode with a schema: ask for `{intent, plan}` and validate with zod, retrying once on parse failure |
 | Vision input on chat | The agent looks at the current frames/sheet when the user says "fix the hand in frame 3" | Send only text metadata (frame descriptions saved from the plan) |
@@ -173,7 +173,7 @@ characters
   status           'draft' | 'generating' | 'ready' | 'error',
   source_asset_id  → assets           // user upload
   sheet_id         → character_sheets // active sheet
-  style_json       { logicalHeight: 48|64, paletteSize: 24, outline: true,
+  style_json       { logicalHeight: 128, paletteSize: 24, outline: false,
                      chromaKey: '#FF00FF', mirrorLeft: true, cellW, cellH }
   palette_json     string[]           // locked shared palette from the sheet
   atlas_asset_id   → assets           // current composed atlas
@@ -250,7 +250,7 @@ user image
 for each action × direction:
    (D) PLAN (LLM or default preset) → ActionPlan (frames, poses, timing, canvas)
    (E) STRIP  ── 1 image call per ≤N frames ──►  strip_raw_k.png
-   (F) PROCESS (deterministic): key → split → snap → palette → outline → align → cells
+   (F) PROCESS (deterministic): key → split → snap → palette → align → tight crop
    ▼
 (G) COMPOSE ATLAS (deterministic): all active versions → atlas.png + manifest.json
 ```
@@ -272,7 +272,7 @@ Only **B** and **E** call the image model, and only **D** (for chat actions) cal
 ```
 Create a character turnaround sheet for a 2D video game.
 Style: anime-inspired pixel art, chibi proportions (head ≈ 1/3 of height), crisp square pixels,
-limited palette (~24 colors), 1px dark outline, flat cel shading, no anti-aliasing, no gradients,
+limited palette (~24 colors), no added silhouette outline or colored halo, flat cel shading, no anti-aliasing, no gradients,
 no text, no shadows on the ground.
 Character: <user description or "the character in the reference image">. Preserve hair style and
 color, outfit, accessories, and color scheme from the reference.
@@ -289,6 +289,8 @@ References: `[user_image, layout_guide]`.
 **User review (gate):** show the sheet with "Looks good" / "Regenerate" / "Regenerate with note…". Default actions are queued **only after acceptance**, because a bad sheet poisons every strip. Give the user an "auto-accept" toggle for the fast path.
 
 ### 5.3 (C) Sheet processing
+
+**Preserve the identity master:** save the full-resolution transparent sheet before any resizing or palette reduction. Review, downloads, and revision references use that native-resolution asset. Keep native per-direction identity crops for image-model references. The logical-height, pixel-grid, palette and cell steps below produce separate runtime sprites; they must never replace the full-resolution master.
 1. **Chroma removal** (`pixel/chroma.ts`): remove pixels within a distance threshold of the key (default 96 in RGB space), then unmix edge pixels into despilled RGB plus alpha (ported from sprite-gen `remove_chroma_background`). If the model returned real alpha, skip this step.
 2. **Connected components** (`pixel/components.ts`): flood-fill alpha blobs, then pick the K largest as poses, sorted by x. Smaller blobs (detached hair strands, sparkles) attach to the nearest pose. If K is wrong, **retry generation once**, then surface an error to the user.
 3. **Pixel grid detection** (`pixel/grid.ts`): estimate the pixel pitch per pose by edge-to-gridline alignment (sprite-gen `detect_pixel_pitch`) and take the median. This gives `logicalHeight`, the character's height in real pixels, typically 40–64.
@@ -316,8 +318,8 @@ Chat-created actions get their plan from the agent (§7.3). The schema is identi
 **Canvas shapes:** `standard` (cell 1:1.25), `wide` (attacks with weapon reach or effects, 1.75:1.25), `tall` (big vertical poses, 1:1.75). The planner picks one, and the shape drives the layout guide and the cell size of that action.
 
 ### 5.5 (E) Strip generation: the atlas row
-- **One image call = one horizontal strip** of up to `MAX_FRAMES_PER_STRIP` frames, 6 by default. sprite-gen's validation found that 4–6 is stable and that 9+ causes duplicates and merged poses.
-- **More frames needed?** Split into segments of ≤6 and generate them **sequentially**. Segment *k* gets the references `[anchor, layout_guide_k, last frame(s) of segment k-1]`, plus prompt text giving its frame range ("frames 7–12 of 12, continuing from the attached previous frames"). After processing, the segments are concatenated into one logical row. Different actions and directions run **in parallel**, limited by `CHAR2D_MAX_PARALLEL_IMAGE_JOBS`.
+- **One image call = one horizontal strip** of up to `MAX_FRAMES_PER_STRIP` frames, **4 maximum per request**. Actions may contain more total frames, but must use multiple generation calls.
+- **More frames needed?** Split into segments of ≤4 and generate them **sequentially**. Segment *k* gets the references `[anchor, layout_guide_k, last frame(s) of segment k-1]`, plus prompt text giving its frame range ("frames 5–8 of 12, continuing from the attached previous frames"). After processing, the segments are concatenated into one logical row. Different actions and directions run **in parallel**, limited by `CHAR2D_MAX_PARALLEL_IMAGE_JOBS`.
 - **Layout guide** for the strip: `frames × cellW` by `cellH` (scaled to the model's allowed size), with invisible slots, a baseline, and safe margins.
 - **References:** `[direction anchor (8×), layout guide, (optional) previous segment]`. **Never the original upload** (identity rule).
 - **Prompt template** (`pipeline/prompts/strip.ts`, adapted from sprite-gen `row_prompt`):
@@ -327,7 +329,7 @@ Chat-created actions get their plan from the agent (§7.3). The schema is identi
   Frame-by-frame poses (left to right):
   1. {pose1} … N. {poseN}
   Rules:
-  - Identity lock: copy face, hair, outfit, colors, outline weight, proportions and accessories
+  - Identity lock: copy face, hair, outfit, colors, pixel density, proportions and accessories
     exactly from the anchor. This strip owns motion only.
   - Animate IN PLACE: feet stay on the same baseline unless the pose is airborne; the character does
     not travel across the strip. Same scale in every frame.
@@ -335,7 +337,7 @@ Chat-created actions get their plan from the agent (§7.3). The schema is identi
     padding inside each slot.
   - Effects (slashes, sparks, dust) only if listed in the pose text, and they must stay inside the
     same slot and touch the character.
-  - Same pixel-art style as the anchor: crisp square pixels, ~24 colors, 1px dark outline,
+  - Same pixel-art style as the anchor: crisp square pixels, ~24 colors, no added outline, colored rim, or key-colored halo,
     no anti-aliasing, no motion blur.
   - Background: perfectly flat solid {key}; never use {key} on the character.
   ```
@@ -346,9 +348,9 @@ Chat-created actions get their plan from the agent (§7.3). The schema is identi
 2. Component extraction → exactly N poses. On a count mismatch, try `projection` segmentation (sprite-gen `separate_fused_poses`: a vertical cut at minimum-cost projection). If that fails, the job fails with `extract_mismatch`, auto-retries generation once, then reports to the user.
 3. Pixel snap with the **sheet's pitch** as a hint (per-frame pitch detection with the median as fallback).
 4. Quantize to the **locked character palette**.
-5. Optional 1px outline (on by default for the anime pixel style).
+5. Do not synthesize an outline. Remove background-color spill without adding a silhouette stroke; preserve the reference artwork’s intentional edge details.
 6. **Registration:** align frames on the anchor point. `anchorX` = alpha-weighted centroid of the lower 30% of the body (stable feet); `anchorY` = lowest opaque row (the baseline) for grounded frames. For airborne frames (flagged in the plan), keep the vertical offset relative to frame 1's baseline so the jump pose reads correctly while physics handles the real height.
-7. **Fit to cell:** upscale to integer scale 1× (we store **logical-resolution** frames; the renderer scales with nearest-neighbour). Place each frame in the action's cell (`cellW×cellH` in logical pixels, e.g. 48×60 standard) at the anchor.
+7. **Native scale and tight crop:** preserve sheet and action source pixels without logical-height resizing or palette reduction. Build native-reference layout guides with 88% vertical pose occupancy and at most four frames per request, using smaller batches for large poses. Crop frames to visible bounds plus one transparent pixel and transform pivots with the crop. Store provider-to-guide scale as frame metadata; the preview fits frames proportionally on a DPR-aware canvas and supports 100% source-pixel zoom.
 8. Basic QA flags, stored on the version and shown as warnings: empty or sparse frame, near-duplicate frames (dHash), frame-size outliers, leftover key pixels.
 
 ### 5.7 (G) Atlas composition (`pipeline/atlas.ts`)
@@ -361,9 +363,9 @@ Chat-created actions get their plan from the agent (§7.3). The schema is identi
 | Step | Calls | Notes |
 |---|---|---|
 | Sheet | 1 image (+1 retry worst case) | |
-| Defaults (side_scroller) | 4 image | parallel ×2 → about 2 rounds |
-| Defaults (top_down) | 6 image | |
-| New chat action | 1 chat + 1 image per direction per ≤6 frames | e.g. attack R (+mirror) = 1 image |
+| Defaults (side_scroller) | 5 image | parallel ×2 → about 2 rounds |
+| Defaults (top_down) | 9 image | |
+| New chat action | 1 chat + 1 image per direction per ≤4 frames | e.g. attack R (+mirror) = 1 image |
 | Retime / gameplay tweak | 1 chat, **0 image** | |
 
 Show a pre-run estimate ("This will make 2 image generations") in the plan card (§7.4).
@@ -466,9 +468,9 @@ rename_action({ actionKey, label }) / delete_action({ actionKey })   // delete r
 ```
 Rules in the system prompt:
 - Use a no-image tool (`retime_action`, `tune_gameplay`) whenever the request can be met by timing or physics alone.
-- Keep the default actions' keys; the agent may adjust but not delete them.
+- Keep default action keys when adjusting them. Manual action deletion is supported, including defaults. An agent may delete a default only on an explicit user request and after the product confirmation step.
 - Never put displacement in the poses (in-place rule). Put movement in `gameplay.rootMotion`.
-- Frame budget: 2–6 frames for most actions; >6 only when the user asks for "smooth/long", which triggers multi-strip generation.
+- Frame budget: prefer 2–4 frames for new actions. Any action with more than 4 frames uses multiple image requests of at most 4 frames each; default walk retains 6 total frames as 4 + 2.
 - Respect the view type: in top_down, a new action needs `down, up, right` (with left mirrored) unless it is a non-directional effect such as an emote ("only down").
 - Ask a clarifying question **only** when the target is truly ambiguous (two equally likely actions).
 
@@ -496,7 +498,7 @@ type ActionPlan = {
   |---|---|---|
   | "make walking faster" | `tune_gameplay(moveSpeed↑)` + `retime_action(fps↑)` | 0 |
   | "the jump should be floatier" | `tune_gameplay(gravityScale↓)` + retime the airborne frames longer | 0 |
-  | "add a sword slash on J" | `create_action(attack_slash, wide, 5 frames)` + binding | 1 |
+  | "add a sword slash on J" | `create_action(attack_slash, wide, 4 frames)` + binding | 1 |
   | "the slash should have a fire trail" | `adjust_action(regenerate)` with effects | 1 |
   | "fast forward dash" | `create_action(dash, 4 frames, rootMotion dx=96 overMs=200)` | 1 |
   | "frame 3 of the crouch looks broken" | `adjust_action(regenerate_frames [2])`* | 1 |
@@ -549,7 +551,7 @@ Validate every input with zod. Upload limits: ≤10 MB; png/jpg/webp. Decode wit
 
 **`/create` Wizard (3 steps):**
 1. Upload (drag-drop, paste, camera on mobile) with a preview.
-2. View type: two big illustrated cards, **Side-scroller** (shows "← → Jump Crouch") and **Top-down** (shows "↑ ↓ ← →"), plus name/description and an advanced drawer (pixel height 48/64, palette size, mirror left/right).
+2. View type: two big illustrated cards, **Side-scroller** (shows "← → Jump Crouch") and **Top-down** (shows "↑ ↓ ← →"), plus name/description and an advanced drawer (fixed 128-pixel height, palette size, mirror left/right).
 3. Sheet generation: a progress animation (pixel sparkles from the logo), then the review gate (§5.2).
 
 **`/characters/[id]` Character Maker**
@@ -715,9 +717,9 @@ Requirements: Node ≥ 20. `better-sqlite3` and `sharp` ship prebuilt binaries f
 | `separate_fused_poses` (projection DP) | Port (fallback only) | `pixel/segment.ts` |
 | pixel-unfake: pitch detect, phase snap, dominant color, alpha binarize | Port the core; skip runlen crosscheck v1 | `pixel/grid.ts`, `pixel/snap.ts` |
 | `build_shared_palette` / `apply_palette` | Port, but lock the palette from the **sheet** | `pixel/palette.ts` |
-| `enforce_outline`, `register_row_frames` | Port | `pixel/outline.ts`, `pixel/register.ts` |
+| `enforce_outline`, `register_row_frames` | Skip outline addition; adapt registration | `pixel/outline.ts`, `pixel/register.ts` |
 | `manifest.json.frame_layout` absolute rects | Same idea, our schema | §6.1 |
-| Frame-count guidance (4–6 stable) | `MAX_FRAMES_PER_STRIP = 6` | — |
+| Frame-count guidance (4 per call maximum) | `MAX_FRAMES_PER_STRIP = 4` | — |
 | Curation webview, breathing, recolor, video pipeline, scene renderer, providers codex/grok | **Skip for v1** (the video→loop pipeline is a v2 idea if Muse offers video) | — |
 
 Port approach: read the Python, write TS with the same function names and comments that cite the source file, and build **golden tests**: run sprite-gen on 3–4 fixture strips and assert that our TS output matches within a tolerance (frame count, bboxes ±1 px, palette size).
@@ -737,7 +739,7 @@ Each phase is shippable on its own and comes with acceptance criteria.
 - ✅ An uploaded anime image produces an accepted pixel sheet with 3 clean transparent anchors on ≥4 of 5 test images.
 
 **Phase 2: Strips and atlas (4–5 days)**
-- Presets, strip generation, multi-strip segments, processing (snap, palette, outline, register), atlas plus manifest, mirroring, QA flags.
+- Presets, strip generation, multi-strip segments, processing (snap, palette, register, tight crop), atlas plus manifest, mirroring, QA flags.
 - ✅ Both view types generate all default actions automatically. The manifest validates. The frames show no visible key fringe, the palette stays consistent, and the feet don't jitter in idle/walk.
 
 **Phase 3: Character Maker (4–5 days)**
@@ -788,3 +790,8 @@ Total: about 5–6 weeks for one full-stack developer, or about 3 weeks for two,
 2. Should one character be allowed to support **both** view types? That would mean generating both default sets and making both worlds available for it. This plan currently says one view type per character.
 3. Auto-generate threshold: should chat actions start generating immediately, or always show the plan card for confirmation first?
 4. Muse pricing and rate limits: these determine `MAX_PARALLEL_IMAGE_JOBS` and whether to show cost estimates in currency.
+
+
+### Native action pipeline implementation update
+
+The implemented action pipeline supersedes earlier logical-grid/palette normalization steps: full-resolution identity crops, native layout guides, and extracted frames preserve source resolution and colors. Stored `logicalHeight` remains metadata, not an action downsampling target. Saved raw strips can be restored without AI calls; regeneration uses adaptive batches of up to four frames. See docs/setup.md for rendering and manifest scale behavior.

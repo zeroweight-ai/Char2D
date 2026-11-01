@@ -1,0 +1,9 @@
+Char2D
+Copyright 2026 Char2D contributors
+
+The design draws on sprite-gen, Copyright 2026 Alex Kim, Apache-2.0.
+No sprite-gen algorithms have been ported in the repository skeleton.
+Future ports must retain applicable source attribution and third-party notices.
+
+The demo pixel character sheet is original synthetic artwork created for Char2D.
+No third-party world tilesets are included yet.
