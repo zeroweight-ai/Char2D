@@ -8,7 +8,7 @@ test("top-down acceptance generates three directions, mirrors left, and plays fr
   await expect(page.getByRole("heading",{name:"Your transparent character sheet"})).toBeVisible({timeout:30_000});
   const detail=await (await request.get(`/api/characters/${id}`)).json();
   await page.getByRole("button",{name:"Looks good — accept sheet"}).click();
-  await expect(page.getByRole("heading",{name:"Animations ready",exact:true})).toBeVisible({timeout:30_000});
+  await expect(page.getByTestId("hero-status")).toHaveText("Ready to play",{timeout:30_000});
   const duplicate=await request.post(`/api/characters/${id}/sheet/accept`,{data:{sheetId:detail.sheet.id}});
   expect(duplicate.status()).toBe(202);expect((await duplicate.json()).alreadyQueued).toBe(true);
   const character=await (await request.get(`/api/characters/${id}`)).json();
@@ -26,9 +26,10 @@ test("top-down acceptance generates three directions, mirrors left, and plays fr
     return (last-first+1)/c.height;
   })).toBeGreaterThan(0.7);
   await page.getByLabel("Animation direction",{exact:true}).selectOption("up");await expect(canvas).toHaveAttribute("data-direction","up");
-  await page.getByRole("button",{name:"Pause",exact:true}).click();await page.getByLabel("Animation frame",{exact:true}).fill("4");await expect(canvas).toHaveAttribute("data-frame","4");
+  await page.getByRole("button",{name:"Pause",exact:true}).click();await page.getByLabel("Animation frame",{exact:true}).fill("3");await expect(canvas).toHaveAttribute("data-frame","3");
   await page.getByRole("group",{name:"Animation stage, keyboard controls"}).focus();await page.keyboard.down("ArrowLeft");await expect(canvas).toHaveAttribute("data-direction","left");await page.keyboard.up("ArrowLeft");await expect(canvas).toHaveAttribute("data-action","idle");
-  await page.reload();await expect(page.getByRole("heading",{name:"Animation preview",exact:true})).toBeVisible();
+  await page.reload();await expect(page.getByRole("tab",{name:"Play",selected:true})).toBeVisible();
+  await page.getByText("View ▾").click();
   await page.getByLabel("Preview zoom",{exact:true}).selectOption("native");
   await expect(canvas).toHaveAttribute("data-render-scale","1");
   await page.getByLabel("Preview zoom",{exact:true}).selectOption("fit");

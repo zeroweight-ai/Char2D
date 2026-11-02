@@ -47,7 +47,7 @@ ${!isWalk&&["idle","walk","jump","crouch"].includes(input.actionKey??input.label
 - This is a peaceful locomotion/rest pose, never a combat or attack animation. Do not draw, aim, swing, thrust, fire, brandish or activate a weapon; no attack stance, muzzle flash, projectile or weapon effects.
 - Keep existing weapons safely sheathed, holstered or stowed in their reference location. Do not invent equipment. If a weapon is already carried in hand, keep it lowered and passive with the same grip; weapon safety takes priority over generic open-hand or arm-swing instructions. Adapt that arm naturally without using the weapon.
 - Idle establishes the relaxed stance, grip, equipment placement and neutral expression used by the other basic actions.
-` : ""}${isWalk ? walkGuidance+"\n" : ""}${input.idleReference&&isWalk ? `IDLE FOUNDATION (CRITICAL):
+` : ""}${isWalk ? walkGuidance(input.direction)+"\n" : ""}${input.idleReference&&isWalk ? `IDLE FOUNDATION (CRITICAL):
 - The FIRST reference defines exact character identity, pixel resolution, scale, colors, and 1px dark outlines.
 - The LAST reference is the generated Idle frame for this facing direction. Preserve its exact head design, facial expression, proportion, and passive item grip, modifying only limb positions, vertical body bounce, and cloth sway for walking.
 - Do not add an Idle slot: all four frames must be active walking poses.
@@ -60,7 +60,10 @@ ${!isWalk&&["idle","walk","jump","crouch"].includes(input.actionKey??input.label
 - The FIRST reference remains the authority for identity, native detail and scale. Idle is the pose/continuity foundation. Begin the motion naturally from Idle; do not add an extra Idle slot or replace a required action phase.
 - Keep weapons stowed or passively lowered exactly as in Idle throughout the action. Return toward Idle for looping locomotion; preserve the specified airborne or crouched final pose for held actions.
 ` : ""}
-${isCustom ? `CUSTOM ACTION — FRAME-BY-FRAME CONSTRUCTION (CRITICAL):
+${input.segment && input.actionReference && !isCustom ? `CROSS-STRIP CONTINUITY (CRITICAL):
+- ${input.idleReference?"The reference immediately before LAST":"The LAST reference"} is frame 1 of THIS action from the previous strip. Draw every pose in this strip at EXACTLY its character height, head size and pixel density — never larger, never zoomed in. Keep the whole body, including both feet and the top of the head, inside the canvas with clear margin.
+${isWalk ? "- WALK LEG ORDER: This strip continues the same walk cycle. Frame 3 is the leg-swapped opposite of that frame 1: the leg in FRONT in frame 1 must be BEHIND in frame 3, and the leg BEHIND in frame 1 must be in FRONT. Never repeat frame 1's leg layout.\n" : ""}
+` : ""}${isCustom ? `CUSTOM ACTION — FRAME-BY-FRAME CONSTRUCTION (CRITICAL):
 - SIZE LOCK: Use identical head size, torso width, limb thickness and native pixel density in EVERY action frame. A wider silhouette from an arm or weapon does not mean a larger character. Never enlarge later frames, zoom into the active swing or fit each pose independently to its slot.
 - WEAPON LENGTH LOCK: Preserve the reference weapon's complete hilt, guard and blade, including its blade-to-body length ratio, tip shape and thickness. Do not shorten, retract, bend or replace the weapon to fit the frame. For a horizontal slash keep the full blade visibly extended in the swing plane; do not foreshorten it into a stub.
 ${input.actionReference ? `- ${input.idleReference?"The reference immediately before LAST":"The LAST reference"} is frame 1 of THIS action. Preserve its body and weapon proportions across strips, while matching the Idle size reference when provided. It is a continuity reference, not an instruction to repeat its pose.\n` : ""}

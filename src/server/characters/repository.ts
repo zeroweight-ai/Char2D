@@ -7,7 +7,8 @@ import { JobQueue } from "../jobs/queue";
 import { estimateStripCalls } from "../pipeline/estimate";
 import { limitActionPlan,directionSchema } from "@/lib/manifest";
 import { z } from "zod";
-import { manifestSchema } from "@/lib/manifest";
+import { gameplaySchema,manifestSchema } from "@/lib/manifest";
+import { getBindings } from "./controls";
 import { framesSchema } from "../pipeline/animation-types";
 import { styleSchema } from "@/lib/character";
 import { sheetJobPayloadSchema } from "../ai/revision";
@@ -27,13 +28,16 @@ export function getCharacter(id:string) {
   const animationJobs=sheet?db.select().from(jobs).where(and(eq(jobs.characterId,id),inArray(jobs.type,["strip","process_action","compose_atlas"]),sql`json_extract(${jobs.payloadJson}, '$.sheetId') = ${sheet.id}`,sql`coalesce(json_extract(${jobs.payloadJson}, '$.retired'), 0) = 0`)).all():[];
   const actionList=db.select().from(actions).where(eq(actions.characterId,id)).orderBy(actions.sortOrder,actions.createdAt).all().map(action=>{
     const version=db.select().from(actionVersions).where(eq(actionVersions.actionId,action.id)).orderBy(desc(actionVersions.version)).get();
-    return {nativeResolution:version?Object.values(framesSchema.parse(JSON.parse(version.framesJson))).flat().every(frame=>frame.scale!==undefined)&&Object.keys(JSON.parse(version.framesJson)).length>0:false,imageCalls:version&&sheet?estimateStripCalls(sheet,limitActionPlan(JSON.parse(version.planJson)).frames,z.array(directionSchema).parse(JSON.parse(action.directionsJson)),limitActionPlan(JSON.parse(version.planJson)).canvas):0,key:action.key,label:action.label,status:version?.status??"queued",version:version?.version??0,error:version?.error??null,frames:version?framesSchema.parse(JSON.parse(version.framesJson)):{} };
+    const history=db.select({id:actionVersions.id,version:actionVersions.version,status:actionVersions.status,createdBy:actionVersions.createdBy,createdAt:actionVersions.createdAt}).from(actionVersions).where(eq(actionVersions.actionId,action.id)).orderBy(actionVersions.version).all();
+    const active=history.find(item=>item.id===action.activeVersionId);
+    return {activeVersionId:action.activeVersionId,activeVersion:active?.version??null,versions:history,gameplay:gameplaySchema.parse(JSON.parse(action.gameplayJson)),nativeResolution:version?Object.values(framesSchema.parse(JSON.parse(version.framesJson))).flat().every(frame=>frame.scale!==undefined)&&Object.keys(JSON.parse(version.framesJson)).length>0:false,imageCalls:version&&sheet?estimateStripCalls(sheet,limitActionPlan(JSON.parse(version.planJson)).frames,z.array(directionSchema).parse(JSON.parse(action.directionsJson)),limitActionPlan(JSON.parse(version.planJson)).canvas):0,key:action.key,label:action.label,status:version?.status??"queued",version:version?.version??0,error:version?.error??null,frames:version?framesSchema.parse(JSON.parse(version.framesJson)):{} };
   });
   const warnings=animationJobs.flatMap(job=>getDatabase().sqlite.prepare("SELECT data_json FROM job_events WHERE job_id=? AND kind='qa'").all(job.id) as {data_json:string}[]).flatMap(row=>{const value=JSON.parse(row.data_json);return Array.isArray(value.warnings)?value.warnings.filter((w:unknown)=>typeof w==="string"):[];});
   return {id:character.id,name:character.name,description:character.description,viewType:character.viewType,status:character.status,sourceAssetId:character.sourceAssetId,
     sheet:sheet ? {fullResolution,warnings:sheetWarnings as string[],id:sheet.id,status:sheet.status,rawAssetId:sheet.rawAssetId,processedAssetId:sheet.processedAssetId,version:sheet.version}:null,
     manifest:character.manifestJson?manifestSchema.parse(JSON.parse(character.manifestJson)):null,
     animation:animationJobs.length?{total:animationJobs.length,done:animationJobs.filter(j=>j.status==="done").length,running:animationJobs.filter(j=>j.status==="running"||j.status==="queued").length,error:animationJobs.find(j=>j.error&&j.error!=="Dependency failed")?.error??animationJobs.find(j=>j.status==="error")?.error??null,warnings:[...new Set(warnings)] as string[],actions:actionList}:null,
+    bindings:actionList.length?getBindings(id):{p1:{},p2:{}},
     job:job ? {id:job.id,status:job.status,error:job.error,revision:payload?.success ? payload.data.generation ?? null:null}:null};
 }
 export function queueSheet(characterId:string,note="",isRevision=false) {

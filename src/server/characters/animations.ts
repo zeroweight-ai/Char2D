@@ -2,7 +2,7 @@ import "server-only";
 import { and,desc,eq,inArray,sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDatabase } from "../db";
-import { actions,actionVersions,characters,characterSheets,inputBindings,jobs } from "../db/schema";
+import { actions,actionVersions,characters,characterSheets,jobs } from "../db/schema";
 import { JobQueue } from "../jobs/queue";
 import { storedActionPlanSchema,limitActionPlan,directionSchema } from "@/lib/manifest";
 import { z } from "zod";
@@ -38,8 +38,6 @@ export function acceptAndAnimate(characterId:string,sheetId:string) {
       const strips=preset.directions.map(direction=>queue.enqueue("strip",{sheetId,versionId,direction,idleVersionId},{characterId,actionVersionId:versionId,dependsOn:[prepare,...(idleFinished?[idleFinished]:[])],maxAttempts:1}));
       done.push(queue.enqueue("process_action",{sheetId,versionId,stage:"finish"},{characterId,actionVersionId:versionId,dependsOn:strips,maxAttempts:1}));
       if(preset.key==="idle"){idleVersionId=versionId;idleFinished=done[done.length-1];}
-      const bindings:Record<string,string[]> = character.viewType==="side_scroller" ? {walk:["KeyA","KeyD"],jump:["KeyW","Space"],crouch:["KeyS"]}:{walk:["KeyW","KeyA","KeyS","KeyD"]};
-      for(const code of bindings[preset.key]??[]) db.insert(inputBindings).values({id:nanoid(),characterId,actionId:action.id,profile:"p1",device:"keyboard",code,trigger:preset.gameplay.trigger}).onConflictDoNothing().run();
     });
     const jobId=queue.enqueue("compose_atlas",{sheetId,versionIds},{characterId,dependsOn:done,maxAttempts:1});
     db.update(characterSheets).set({status:"accepted"}).where(eq(characterSheets.id,sheetId)).run();

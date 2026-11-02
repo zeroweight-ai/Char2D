@@ -5,30 +5,31 @@ test("regenerates one action from its button and publishes a new atlas",async({p
   const response=await request.post("/api/characters",{multipart:{mode:"prompt",name:`Regenerate walk ${Date.now()}`,description:"green knight",viewType:"side_scroller"}});
   expect(response.status()).toBe(202);const {id}=await response.json();
   await page.goto(`/characters/${id}`);await expect(page.getByRole("heading",{name:"Your transparent character sheet"})).toBeVisible({timeout:30_000});
-  await page.getByRole("button",{name:"Looks good — accept sheet"}).click();await expect(page.getByRole("heading",{name:"Animations ready",exact:true})).toBeVisible({timeout:30_000});
+  await page.getByRole("button",{name:"Looks good — accept sheet"}).click();await expect(page.getByTestId("hero-status")).toHaveText("Ready to play",{timeout:30_000});
   const before=await (await request.get(`/api/characters/${id}`)).json();
+  await page.getByRole("tab",{name:"Moves"}).click();
   const queued=page.waitForResponse(r=>r.url().endsWith(`/api/characters/${id}/actions/walk/regenerate`)&&r.request().method()==="POST");
   await page.getByRole("button",{name:"Regenerate Walk",exact:true}).click();
-  const regeneration=await queued;expect(regeneration.status()).toBe(202);expect((await regeneration.json()).imageCalls).toBe(2);
+  const regeneration=await queued;expect(regeneration.status()).toBe(202);expect((await regeneration.json()).imageCalls).toBe(1); // 4 frames fit one strip batch
   await expect.poll(async()=>{
     const value=await (await request.get(`/api/characters/${id}`)).json();
     return value.status==="ready"&&value.manifest?.atlas.version===before.manifest.atlas.version+1;
   },{timeout:30_000}).toBe(true);
-  await expect(page.getByRole("heading",{name:"Animations ready",exact:true})).toBeVisible();
+  await expect(page.getByTestId("hero-status")).toHaveText("Ready to play");
   await expect(page.getByRole("button",{name:"Regenerate Walk",exact:true})).toBeEnabled();
   const after=await (await request.get(`/api/characters/${id}`)).json();
   expect(after.animation.actions.find((action:{key:string})=>action.key==="walk").version).toBe(2);
   for(const action of after.animation.actions)if(action.key!=="walk")expect(action.version).toBe(1);
   expect((await request.get(before.manifest.atlas.url)).ok()).toBe(true);
-  await page.getByRole("button",{name:"Walk",exact:true}).click();await expect(page.getByTestId("sprite-player")).toHaveAttribute("data-action","walk");
-  await page.reload();await expect(page.getByRole("button",{name:"Regenerate Walk",exact:true})).toBeEnabled();
+  await page.getByRole("tab",{name:"Play"}).click();await page.getByRole("button",{name:"Walk",exact:true}).click();await expect(page.getByTestId("sprite-player")).toHaveAttribute("data-action","walk");
+  await page.reload();await page.getByRole("tab",{name:"Moves"}).click();await expect(page.getByRole("button",{name:"Regenerate Walk",exact:true})).toBeEnabled();
   expect((await request.post(`/api/characters/${id}/actions/missing/regenerate`)).status()).toBe(404);
   const db=new Database(resolve("data/e2e/char2d.db"));db.pragma("busy_timeout=5000");
   const active=db.prepare("SELECT active_version_id FROM actions WHERE character_id=? AND key='walk'").get(id) as {active_version_id:string};
   const row=db.prepare("SELECT frames_json FROM action_versions WHERE id=?").get(active.active_version_id) as {frames_json:string};
   const frames=JSON.parse(row.frames_json);for(const list of Object.values(frames))for(const frame of list as {scale?:number}[])delete frame.scale;
   db.prepare("UPDATE action_versions SET frames_json=? WHERE id=?").run(JSON.stringify(frames),active.active_version_id);db.close();
-  await page.reload();const restore=page.waitForResponse(r=>r.url().endsWith(`/actions/walk/reprocess`)&&r.request().method()==="POST");
+  await page.reload();await page.getByRole("tab",{name:"Moves"}).click();const restore=page.waitForResponse(r=>r.url().endsWith(`/actions/walk/reprocess`)&&r.request().method()==="POST");
   await page.getByRole("button",{name:"Restore native frames: Walk (no AI call)",exact:true}).click();
   expect((await (await restore).json()).imageCalls).toBe(0);
   await expect.poll(async()=>{const value=await (await request.get(`/api/characters/${id}`)).json();return value.status==="ready"&&value.animation.actions.find((a:{key:string})=>a.key==="walk").version===3;},{timeout:30_000}).toBe(true);

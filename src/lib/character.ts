@@ -1,4 +1,5 @@
-import { viewTypeSchema, type ViewType, type Manifest } from "./manifest";
+import { viewTypeSchema, type ViewType, type Manifest, type ActionGameplay } from "./manifest";
+import type { Bindings } from "./bindings";
 import { z } from "zod";
 export const DEFAULT_CHARACTER_HEIGHT=128;
 export const createCharacterSchema = z.object({
@@ -14,8 +15,11 @@ export const styleSchema = z.object({chromaKey:z.string().regex(/^#[0-9A-F]{6}$/
 export type CharacterDetail = {
   id:string; name:string; description:string; viewType:ViewType; status:string;
   manifest?:Manifest|null;
-  animation?:{total:number;done:number;running:number;error:string|null;warnings:string[];actions:{key:string;label:string;imageCalls?:number;nativeResolution?:boolean;status:string;version:number;error:string|null}[]}|null;
+  animation?:{total:number;done:number;running:number;error:string|null;warnings:string[];actions:CharacterAction[]}|null;
+  bindings?:Bindings;
   sourceAssetId:string|null;
   sheet: {fullResolution?:boolean;warnings?:string[];id:string; status:string; rawAssetId:string|null; processedAssetId:string|null; version:number}|null;
   job: {id:string; status:string; error:string|null;revision?:{path:"edit_latest"|"new_sheet";reason:string}|null}|null;
 };
+export type ActionVersionSummary={id:string;version:number;status:string;createdBy:string;createdAt:number};
+export type CharacterAction={key:string;label:string;imageCalls?:number;nativeResolution?:boolean;status:string;version:number;error:string|null;activeVersionId?:string|null;activeVersion?:number|null;versions?:ActionVersionSummary[];gameplay?:ActionGameplay};

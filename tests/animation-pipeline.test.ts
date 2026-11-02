@@ -73,7 +73,7 @@ it("continues legacy multi-strip action plans",async()=>{
   const strip=queue.claim("test")!;const version=getDatabase().db.select().from(actionVersions).where(eq(actionVersions.id,strip.actionVersionId!)).get()!;
   const plan=JSON.parse(version.planJson);plan.frames=8;plan.poses=[...plan.poses,...plan.poses];plan.durationsMs=[...plan.durationsMs,...plan.durationsMs];
   getDatabase().db.update(actionVersions).set({planJson:JSON.stringify(plan)}).where(eq(actionVersions.id,version.id)).run();
-  await runAnimationJob(strip,queue);expect(state.generate).toHaveBeenCalledTimes(2);expect(state.generate.mock.calls[1][0].references).toHaveLength(3);
+  await runAnimationJob(strip,queue);expect(state.generate).toHaveBeenCalledTimes(2);expect(state.generate.mock.calls[1][0].references).toHaveLength(4); // + frame 1 of this action for scale/leg continuity
 });
 it("retains completed work when retrying failed jobs",async()=>{
   acceptAndAnimate("char","sheet");const queue=new JobQueue();const prepare=queue.claim("test")!;await runAnimationJob(prepare,queue);queue.complete(prepare.id);
@@ -253,7 +253,7 @@ it("finishes Idle first and supplies its matching frame to every basic movement"
   }
   const firstWalk=state.generate.mock.calls.find(([request])=>request.prompt.includes("performing a smooth, continuous Walk cycle"))![0];
   expect(firstWalk.prompt).toContain("ANTI-STUTTER RULE");
-  expect(firstWalk.prompt).toContain("Full Stride A (Near Leg Back, Far Leg Forward)");
+  expect(firstWalk.prompt).toContain("Contact A — NEAR-SIDE LEG IN FRONT");
   const walk=db.select().from(actions).all().find(action=>action.key==="walk")!;
   const oldVersion=db.select().from(actionVersions).where(eq(actionVersions.id,walk.activeVersionId!)).get()!;
   const oldPlan=JSON.parse(oldVersion.planJson);
@@ -264,7 +264,7 @@ it("finishes Idle first and supplies its matching frame to every basic movement"
   expect(regenerated.references.at(-1)).toEqual(idleAsset!.bytes);
   expect(regenerated.prompt).toContain("Frame count: 4");
   expect(regenerated.prompt).toContain("ANTI-STUTTER RULE");
-  expect(regenerated.prompt).toContain("Full Stride A (Near Leg Back, Far Leg Forward)");
+  expect(regenerated.prompt).toContain("Contact A — NEAR-SIDE LEG IN FRONT");
   expect(regenerated.prompt).not.toContain("old pose A");
 });
 

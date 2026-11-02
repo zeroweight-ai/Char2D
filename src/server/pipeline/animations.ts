@@ -12,6 +12,7 @@ import { provider } from "../ai";
 import { chooseChromaKey,removeChroma,cleanSpriteAlpha,sampleColors } from "../pixel/chroma";
 import { alignCharacterScale } from "./character-scale";
 import { extractPoses,extractSlotPoses } from "./frames";
+import { sameLegOrder } from "./pose-checks";
 import { preserveNativeFrames,type NativePose } from "./native-frames";
 import { stripGuide,stripLayout,nativeBatchSize } from "./guides";
 import { sheetAnchorOrder } from "./prompts/sheet";
@@ -152,6 +153,25 @@ export async function runAnimationJob(job:Job,queue:JobQueue) {
           const keyed=removeChroma(decoded.data,decoded.info.width,decoded.info.height,key);
           const transparent=await sharp(cleanSpriteAlpha(keyed.rgba),{raw:{width:decoded.info.width,height:decoded.info.height,channels:4}}).png().toBuffer();
           extracted=await (plan.canvas==="standard"?extractPoses(transparent,poses.length):extractSlotPoses(transparent,poses.length,{retryEdgeContact:attempt===0&&!payload.rawOnly}));
+          // Post-extraction QA. A first failure retries with the reason fed back
+          // to Muse; a repeat failure is kept with a warning.
+          const strict=attempt===0&&!payload.rawOnly;
+          const flag=(message:string)=>{if(strict)throw new Error(`extract_mismatch: ${message}`);warnings.push(`${action.label} ${direction}: ${message}`);};
+          if(offset>0&&["idle","walk"].includes(action.key)&&allPoses.length){
+            // Muse fills the canvas height even when it zooms in (cutting off
+            // the feet), so height alone can't see it; width can. Idle is
+            // static, so its width is tight; a walk stride varies more.
+            const median=(values:number[])=>[...values].sort((a,b)=>a-b)[Math.floor(values.length/2)];
+            const batchScale=stripLayout(Math.min(poses.length,4),reference,plan.canvas,direction).height/decoded.info.height;
+            const batch=extracted.poses,size=(key:"w"|"h")=>median(batch.map(pose=>pose.rect[key]*batchScale))/median(allPoses.map(pose=>pose.rect[key]*pose.scale));
+            const ratio=[size("h"),size("w")].reduce((worst,value)=>Math.abs(Math.log(value))>Math.abs(Math.log(worst))?value:worst);
+            const tolerance=action.key==="idle"?0.12:0.2;
+            if(Math.abs(ratio-1)>tolerance)flag(`frames ${offset+1}–${offset+poses.length} are drawn at ${Math.round(ratio*100)}% of frame 1's size (zoomed or cropped). Draw the full body at frame 1's exact size, feet included`);
+          }
+          if(action.key==="walk"&&(direction==="right"||direction==="left")&&offset<=2&&offset+extracted.poses.length>2){
+            const first=offset===0?extracted.poses[0].png:allPoses[0]?.png;
+            if(first&&await sameLegOrder(first,extracted.poses[2-offset].png,direction))flag("walk frame 3 repeats frame 1's leg order. In frame 3 the leg that was in FRONT in frame 1 must be BEHIND, and the back leg must be in front");
+          }
           sourceHeight=decoded.info.height;break;
         } catch(error) {
           stored!.invalid=true;
@@ -175,7 +195,8 @@ export async function runAnimationJob(job:Job,queue:JobQueue) {
       if(Math.max(...extracted.poses.map(p=>p.rect.h))<reference.height*0.8)warnings.push(`${action.label} ${direction}: returned pixels are below the sheet reference resolution. Local processing preserved them without resampling.`);
       // Keep frame 1 as an immutable scale reference. Never resize later poses
       // by their total silhouette: weapon reach and VFX change those bounds.
-      if(!["idle","walk","jump","crouch"].includes(action.key)&&!actionReference)actionReference=extracted.poses[0].png;
+      // Frame 1 anchors scale (and walk leg order) for every later strip.
+      if(!actionReference)actionReference=extracted.poses[0].png;
       previous=extracted.poses[extracted.poses.length-1].png;
     }
     event(`Preserving native ${action.label} frame pixels`,80);

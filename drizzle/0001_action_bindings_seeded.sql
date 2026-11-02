@@ -1,0 +1,1 @@
+ALTER TABLE `actions` ADD `bindings_seeded` integer DEFAULT false NOT NULL;

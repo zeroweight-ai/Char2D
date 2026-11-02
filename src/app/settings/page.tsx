@@ -1,2 +1,3 @@
 import { Settings } from "@/components/Settings";
-export default function SettingsPage() { return <><span className="eyebrow">Workspace settings</span><h1>Connect your creativity.</h1><Settings /></>; }
+import { DemoJob } from "@/components/DemoJob";
+export default function SettingsPage() { return <><h1>Settings</h1><Settings /><DemoJob /></>; }

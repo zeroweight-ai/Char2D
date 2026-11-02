@@ -25,7 +25,10 @@ export const actions = sqliteTable("actions", {
   id: id(), characterId: text("character_id").notNull().references(() => characters.id, { onDelete: "cascade" }),
   key: text("key").notNull(), label: text("label").notNull(), icon: text("icon"), isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
   directionsJson: text("directions_json").notNull(), activeVersionId: text("active_version_id"), gameplayJson: text("gameplay_json").notNull().default("{}"),
-  sortOrder: integer("sort_order").notNull().default(0), createdAt: createdAt(), updatedAt: updatedAt(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  // Set once default key bindings were assigned, so a key the player cleared stays cleared.
+  bindingsSeeded: integer("bindings_seeded", { mode: "boolean" }).notNull().default(false),
+  createdAt: createdAt(), updatedAt: updatedAt(),
 }, t => [uniqueIndex("action_key").on(t.characterId,t.key)]);
 export const actionVersions = sqliteTable("action_versions", {
   id: id(), actionId: text("action_id").notNull().references(() => actions.id, { onDelete: "cascade" }),

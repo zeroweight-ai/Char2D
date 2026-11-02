@@ -12,5 +12,10 @@ export function Settings() {
     catch {setMessage("Could not reach the server.");}
     finally {setTesting(false);}
   }
-  return <section className="panel"><h2>AI connection</h2>{health.isPending ? <p>Loading settings…</p>:health.isError ? <p className="error">{health.error.message}</p>:<><p><strong>Mode:</strong> {health.data.mode==="fake" ? "Fake AI — no paid calls":"Muse API"}</p><p><strong>API key:</strong> {health.data.keyPresent ? "Detected":"Not configured"}</p><p className="muted">Chat: {health.data.chatModel}<br />Image: {health.data.imageModel}</p><p>Edit <code>.env.local</code> and restart to change settings. Your key stays on the server.</p><button onClick={test} disabled={testing || (health.data.mode==="muse" && !health.data.keyPresent)}>{testing ? "Testing…":"Test connection"}</button>{health.data.mode==="muse" && <p className="muted">Testing makes one small chat request to Muse.</p>}</>}<p role="status">{message}</p></section>;
+  return <section className="panel options-menu"><h2>AI connection</h2>{health.isPending ? <p>Loading settings…</p>:health.isError ? <p className="error">{health.error.message}</p>:<>
+    <dl><dt>Mode</dt><dd>{health.data.mode==="fake" ? "Fake AI — no paid calls":"Muse API"}</dd><dt>API key</dt><dd>{health.data.keyPresent ? "Detected":"Not configured"}</dd><dt>Chat model</dt><dd>{health.data.chatModel}</dd><dt>Image model</dt><dd>{health.data.imageModel}</dd></dl>
+    <p className="muted">Edit <code>.env.local</code> and restart to change settings. Your key stays on the server.</p>
+    <button onClick={test} disabled={testing || (health.data.mode==="muse" && !health.data.keyPresent)}>{testing ? "Testing…":"Test connection"}</button>
+    {health.data.mode==="muse" && <p className="fine-print">Testing makes one small chat request to Muse.</p>}
+  </>}<p role="status">{message}</p></section>;
 }

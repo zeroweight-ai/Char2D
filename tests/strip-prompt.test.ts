@@ -93,16 +93,16 @@ it("uses the continuous near/far Walk cycle even when regenerating an older plan
   const input={label:"Walk",actionKey:"walk",idleReference:true,direction:"right" as const,poses:["old A","old B","old C","old D"],key:"#FF00FF",segment:0,total:4,playback:"loop" as const};
   const prompt=stripPrompt(input);
   expect(prompt).toContain("performing a smooth, continuous Walk cycle");
-  expect(prompt).toContain("Full Stride A (Near Leg Back, Far Leg Forward)");
-  expect(prompt).toContain("Passing High-Point B (Far Leg Swinging Forward)");
+  expect(prompt).toContain("Contact A — NEAR-SIDE LEG IN FRONT");
+  expect(prompt).toContain("Passing B — FAR-SIDE LEG PLANTED, NEAR-SIDE LEG LIFTED");
   expect(prompt).toContain("ANTI-STUTTER RULE");
   expect(prompt).toContain("1 shade darker from the existing palette");
   expect(prompt).not.toContain("old A");
   expect(prompt).not.toContain("Return toward Idle");
   const continuation=stripPrompt({...input,direction:"left",poses:["old C","old D"],segment:1,startFrame:3});
   expect(continuation).toContain("facing left");
-  expect(continuation).toContain("Action frame 3 of 4: Full Stride B");
-  expect(continuation).not.toContain("Action frame 3 of 4: Full Stride A");
+  expect(continuation).toContain("Action frame 3 of 4: Contact B");
+  expect(continuation).not.toContain("Action frame 3 of 4: Contact A");
 });
 
 it("defaults every camera to Right Side, Front, Behind and preserves legacy anchor order",async()=>{

@@ -3,7 +3,7 @@ import sharp from "sharp";
 for(const mode of ["prompt","upload"] as const) {
   test(`create from ${mode}, remove background, review and accept`,async({page,request})=>{
     await page.goto("/");
-    await page.getByRole("link",{name:"Create a character →"}).click();
+    await page.getByRole("link",{name:"▶ Create a character",exact:true}).click();
     await page.getByRole("radio",{name:mode==="prompt" ? /Describe a character/:/Upload an image/}).check();
     await expect(page.getByLabel("Character pixel height",{exact:true})).toHaveCount(0);
     await page.getByLabel("Character name").fill(`${mode} knight ${Date.now()}`);
@@ -23,8 +23,7 @@ for(const mode of ["prompt","upload"] as const) {
     const wrongSheet=await request.post(`${new URL(page.url()).pathname.replace("/characters/","/api/characters/")}/sheet/accept`,{data:{sheetId:"stale-sheet-id"}});
     expect(wrongSheet.status()).toBe(409);
     await page.getByRole("button",{name:"Looks good — accept sheet"}).click();
-    await expect(page.getByRole("heading",{name:"Character sheet accepted"})).toBeVisible();
-    await expect(page.getByRole("heading",{name:"Animations ready",exact:true})).toBeVisible({timeout:30_000});
+    await expect(page.getByTestId("hero-status")).toHaveText("Ready to play",{timeout:30_000});
     await page.getByRole("button",{name:"Walk",exact:true}).click();
     await expect(page.getByTestId("sprite-player")).toHaveAttribute("data-action","walk");
     await page.getByRole("button",{name:"Pause",exact:true}).click();
@@ -32,6 +31,8 @@ for(const mode of ["prompt","upload"] as const) {
     await expect(page.getByTestId("sprite-player")).toHaveAttribute("data-frame","2");
     await page.getByLabel("Animation direction",{exact:true}).selectOption("left");
     await expect(page.getByTestId("sprite-player")).toHaveAttribute("data-direction","left");
+    await page.getByRole("tab",{name:"Character sheet"}).click();
+    await expect(page.getByRole("heading",{name:"Character sheet",exact:true})).toBeVisible();
     await page.getByLabel("Revision note (optional)").fill("Make the cape shorter");
     await page.getByRole("button",{name:"Regenerate sheet",exact:true}).click();
     await expect(page.getByRole("heading",{name:"Your transparent character sheet"})).toBeVisible({timeout:30_000});
@@ -67,9 +68,9 @@ test("selects three-quarter view before generating and preserves it through anim
   const endpoint=new URL(page.url()).pathname.replace("/characters/","/api/characters/");
   expect((await (await request.get(endpoint)).json()).viewType).toBe("three_quarter");
   await page.getByRole("button",{name:"Looks good — accept sheet"}).click();
-  await expect(page.getByRole("heading",{name:"Animations ready",exact:true})).toBeVisible({timeout:30_000});
+  await expect(page.getByTestId("hero-status")).toHaveText("Ready to play",{timeout:30_000});
   const detail=await (await request.get(endpoint)).json();
   expect(detail.manifest.viewType).toBe("three_quarter");
-  expect(detail.manifest.actions.walk.directions.up.frames).toHaveLength(6);
+  expect(detail.manifest.actions.walk.directions.up.frames).toHaveLength(4); // MAX_FRAMES_PER_ACTION
   await expect(page.getByTestId("sprite-player")).toHaveAttribute("data-direction","down");
 });

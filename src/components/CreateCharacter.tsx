@@ -4,12 +4,21 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { PixelIcon, type PixelIconName } from "./PixelIcon";
+const views:Record<ViewType,{icon:PixelIconName;text:string}>={
+  side_scroller:{icon:"side",text:"For platformers. Gets idle, walk, jump and crouch."},
+  top_down:{icon:"top",text:"Seen from above, like classic RPGs. Gets idle and walk in 4 directions."},
+  three_quarter:{icon:"quarter",text:"Angled from above, showing front and side. Gets idle and walk."},
+};
+const ACCEPTED=["image/png","image/jpeg","image/webp"];
 export function CreateCharacter() {
   const router=useRouter();
   const [viewType,setViewType]=useState<ViewType>("side_scroller");
   const [mode,setMode]=useState<"upload"|"prompt">("upload");
   const [file,setFile]=useState<File|null>(null);
   const [preview,setPreview]=useState("");
+  const [dragging,setDragging]=useState(false);
+  const [name,setName]=useState(""),[description,setDescription]=useState("");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const health=useQuery<{mode:string;keyPresent:boolean}>({queryKey:["health"],queryFn:async()=>{const r=await fetch("/api/settings/health");if(!r.ok)throw new Error("Could not check AI connection");return r.json();}});
@@ -18,14 +27,18 @@ export function CreateCharacter() {
     const url=URL.createObjectURL(file);setPreview(url);
     return ()=>URL.revokeObjectURL(url);
   },[file]);
+  function pick(next:File|undefined|null){
+    setError("");if(!next)return;
+    if(!ACCEPTED.includes(next.type)){setError("Use a PNG, JPEG, or WebP image.");return;}
+    if(next.size>10*1024*1024){setError("Images must be 10 MB or smaller.");return;}
+    setFile(next);
+  }
+  const missing=[mode==="upload"&&!file?"an image":mode==="prompt"&&!description.trim()?"a description":null,!name.trim()?"a name":null].filter(Boolean) as string[];
   async function submit(event:React.FormEvent<HTMLFormElement>) {
     event.preventDefault();setError("");
-    const form=new FormData(event.currentTarget);form.set("mode",mode);
-    if(mode==="upload") {
-      if(!file) {setError("Choose an image to convert.");return;}
-      if(file.size>10*1024*1024) {setError("Upload must be 10 MB or smaller.");return;}
-      form.set("image",file);
-    }
+    if(missing.length){setError(`Add ${missing.join(" and ")} first.`);return;}
+    const form=new FormData(event.currentTarget);form.set("mode",mode);form.delete("creation-mode");form.delete("image-picker");
+    if(mode==="upload"&&file)form.set("image",file);
     setBusy(true);
     try {
       const response=await fetch("/api/characters",{method:"POST",body:form});
@@ -34,22 +47,44 @@ export function CreateCharacter() {
       router.push(`/characters/${result.id}`);
     } catch(error) {setError(error instanceof Error ? error.message:"Could not create character");setBusy(false);}
   }
-  return <>
-    <fieldset className="creation-options" disabled={busy}><legend>How would you like to start?</legend>
-      <label className={`option-card ${mode==="upload" ? "selected":""}`}><input type="radio" name="creation-mode" checked={mode==="upload"} onChange={()=>{setMode("upload");setError("");}} /><span><strong>Upload an image</strong><small>Turn your photo or drawing into a pixel-art character.</small></span></label>
-      <label className={`option-card ${mode==="prompt" ? "selected":""}`}><input type="radio" name="creation-mode" checked={mode==="prompt"} onChange={()=>{setMode("prompt");setError("");}} /><span><strong>Describe a character</strong><small>Give Muse an idea and create an original character.</small></span></label>
-    </fieldset>
-    <form className="panel character-form" onSubmit={submit}><fieldset disabled={busy}>
-      <fieldset className="creation-options"><legend>Choose your character view</legend>
-        {(Object.keys(viewLabels) as ViewType[]).map(view=><label key={view} className={`option-card ${viewType===view?"selected":""}`}><input type="radio" name="viewType" value={view} checked={viewType===view} onChange={()=>setViewType(view)}/><span><strong>{viewLabels[view]}</strong><small>{view==="side_scroller"?"Eye-level perspective for side-scrolling games.":view==="top_down"?"Steep overhead perspective for top-down games.":"An elevated 45° perspective showing front and side depth."}</small></span></label>)}
-      </fieldset>
-      {mode==="upload" && <div className="upload-box"><label htmlFor="character-image">Character image</label><input id="character-image" type="file" accept="image/png,image/jpeg,image/webp" required onChange={event=>setFile(event.target.files?.[0] ?? null)} /><p className="muted">PNG, JPEG, or WebP · up to 10 MB</p>{preview && <Image src={preview} alt="Source image preview" width={240} height={200} unoptimized className="upload-preview" />}</div>}
-      <label htmlFor="character-name">Character name</label><input id="character-name" name="name" required maxLength={80} placeholder="e.g. Rowan the Green Knight" />
-      <label htmlFor="character-description">{mode==="prompt" ? "Describe your character":"Appearance notes (optional)"}</label><textarea id="character-description" name="description" required={mode==="prompt"} maxLength={2000} rows={5} placeholder={mode==="prompt" ? "A male knight wearing a forest-green tunic and cape, steel armor, brown boots, and a sword…":"Describe details you want to preserve or adjust…"} />
-      <p className="muted">We’ll generate a three-view pixel-art sheet, choose a contrasting background, and remove it. You can review the transparent result before accepting it.</p>
-      <p className="badge">{health.data?.mode==="fake" ? "Fake AI is enabled — this will use a test fixture.":health.data?.mode==="muse" ? "Muse Image — one paid image generation.":"Checking AI connection…"}</p>
+  const cost=health.data?.mode==="fake" ? "Fake AI mode: free test run.":health.data?.mode==="muse" ? "Uses one Muse image generation.":"";
+  return <form className="panel create-form character-form" onSubmit={submit} noValidate>
+    <fieldset disabled={busy}>
+      <section className="form-step" aria-labelledby="step-source">
+        <div className="step-head"><span className="step-no">1</span><h2 id="step-source">Start from a picture or an idea</h2></div>
+        <fieldset className="creation-options two"><legend className="sr-only">How would you like to start?</legend>
+          <label className={`option-card row ${mode==="upload" ? "selected":""}`}><input type="radio" name="creation-mode" checked={mode==="upload"} onChange={()=>{setMode("upload");setError("");}} /><PixelIcon name="upload" className="option-icon"/><span><strong>Upload an image</strong><small>A photo, drawing or sprite</small></span></label>
+          <label className={`option-card row ${mode==="prompt" ? "selected":""}`}><input type="radio" name="creation-mode" checked={mode==="prompt"} onChange={()=>{setMode("prompt");setError("");}} /><PixelIcon name="quill" className="option-icon"/><span><strong>Describe a character</strong><small>Write what it looks like</small></span></label>
+        </fieldset>
+        {mode==="upload" ? <>
+          <label className={`dropzone${dragging?" dragging":""}${preview?" has-file":""}`} onDragOver={event=>{event.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={event=>{event.preventDefault();setDragging(false);pick(event.dataTransfer.files?.[0]);}}>
+            <input id="character-image" name="image-picker" aria-label="Character image" className="sr-only" type="file" accept={ACCEPTED.join(",")} onChange={event=>pick(event.target.files?.[0])} />
+            {preview ? <><Image src={preview} alt="Source image preview" width={240} height={200} unoptimized className="upload-preview" /><span className="dropzone-text"><strong>{file?.name}</strong><small>Click or drop to replace</small></span></>
+              :<><PixelIcon name="upload" className="dropzone-icon"/><span className="dropzone-text"><strong>Drop an image here, or click to choose</strong><small>PNG, JPEG or WebP, up to 10 MB</small></span></>}
+          </label>
+          <label className="field-label" htmlFor="character-description">Appearance notes (optional)</label>
+          <textarea id="character-description" name="description" maxLength={2000} rows={2} value={description} onChange={event=>setDescription(event.target.value)} placeholder="Anything to keep or change, e.g. “keep the red scarf, give it boots”" />
+        </>:<>
+          <label className="field-label" htmlFor="character-description">Describe your character</label>
+          <textarea id="character-description" name="description" maxLength={2000} rows={4} value={description} onChange={event=>setDescription(event.target.value)} placeholder="A knight in a forest-green tunic and cape, steel armor, brown boots, carrying a sword" />
+        </>}
+      </section>
+      <section className="form-step" aria-labelledby="step-name">
+        <div className="step-head"><span className="step-no">2</span><h2 id="step-name">Give it a name</h2></div>
+        <label className="sr-only" htmlFor="character-name">Character name</label>
+        <input id="character-name" name="name" maxLength={80} placeholder="e.g. Rowan the Green Knight" value={name} onChange={event=>setName(event.target.value)} />
+      </section>
+      <section className="form-step" aria-labelledby="step-view">
+        <div className="step-head"><span className="step-no">3</span><div><h2 id="step-view">Pick a game view</h2><p>Not sure? Keep side view.</p></div></div>
+        <fieldset className="creation-options three"><legend className="sr-only">Choose your character view</legend>
+          {(Object.keys(viewLabels) as ViewType[]).map(view=><label key={view} className={`option-card ${viewType===view?"selected":""}`}><input type="radio" name="viewType" value={view} checked={viewType===view} onChange={()=>setViewType(view)}/><PixelIcon name={views[view].icon} className="option-icon"/><span><strong>{viewLabels[view]}</strong><small>{views[view].text}</small></span></label>)}
+        </fieldset>
+      </section>
+      <div className="submit-row">
+        <button type="submit" className="big">{busy ? "Starting…":"Generate character sheet"}</button>
+        <p className="fine-print" aria-live="polite">{missing.length?`Add ${missing.join(" and ")} to continue.`:`${cost} Takes a minute or two.`.trim()}</p>
+      </div>
       {error && <p className="error" role="alert">{error}</p>}
-      <div><button type="submit">{busy ? "Starting generation…":"Generate character sheet"}</button></div>
-    </fieldset></form>
-  </>;
+    </fieldset>
+  </form>;
 }

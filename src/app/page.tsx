@@ -1,8 +1,27 @@
-import Link from "next/link";
+import Image from "next/image";
 import { CharacterGallery } from "@/components/CharacterGallery";
-import { DemoJob } from "@/components/DemoJob";
+import { TitleActions } from "@/components/TitleActions";
+import { PixelIcon } from "@/components/PixelIcon";
+const steps = [
+  { icon: "upload", title: "Add a picture or an idea", text: "Upload a photo or drawing, or describe a character in words." },
+  { icon: "star", title: "Approve the sheet", text: "Muse draws your character from the side, front and back. Accept it or ask for changes." },
+  { icon: "sword", title: "Play and add moves", text: "Idle, walk, jump and crouch are made for you. Try them with your keyboard, then describe new moves." },
+] as const;
 export default function Home() {
-  return <><section className="hero"><span className="eyebrow">One image. A world of possibilities.</span><h1>Your next character<br />starts here.</h1><p className="lead">Turn a photo or drawing into a pixel-art character. Animate it, give it new moves, and bring it into your game.</p><Link className="button" href="/create">Create a character →</Link><span className="badge">Development preview</span></section>
-  <section className="grid" aria-label="Workflow"><article className="panel"><h2>01 · Make it yours</h2><p>Start with an image and choose a side-scroller or top-down character.</p></article><article className="panel"><h2>02 · Give it motion</h2><p>Generate action strips, then refine poses and timing through chat.</p></article><article className="panel"><h2>03 · Press play</h2><p>Map your moves to buttons and explore a sample world.</p></article></section>
-  <CharacterGallery /><DemoJob /></>;
+  return <>
+    <section className="title-screen full-bleed" aria-labelledby="game-title">
+      <div className="title-stack">
+        <h1 id="game-title" className="game-logo"><Image src="/brand/logo-full.png" alt="Char2D" width={900} height={732} priority className="bob-slow" /></h1>
+      </div>
+      <p className="title-tagline">One picture in. A playable pixel-art character out.</p>
+      <TitleActions />
+    </section>
+    <CharacterGallery />
+    <section className="how" aria-labelledby="how-title">
+      <h2 id="how-title">How it works</h2>
+      <ol className="levels">
+        {steps.map((step, index) => <li className="panel level-card" key={step.title}><span className="level-no">{index + 1}</span><h3><PixelIcon name={step.icon} className="option-icon" />{step.title}</h3><p>{step.text}</p></li>)}
+      </ol>
+    </section>
+  </>;
 }
