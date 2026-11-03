@@ -21,6 +21,7 @@ for (const [name, sound] of Object.entries(DEFAULT_SOUNDS)) {
   const file = join(process.cwd(), "public", sound.url);
   if (existsSync(file) && !force) { console.log(`skip ${name} (exists)`); continue; }
   const response = await fetch(`${baseUrl}/sound-generation?output_format=mp3_44100_128`, { method: "POST", headers: { "xi-api-key": key, "Content-Type": "application/json", Accept: "audio/mpeg" },
+    // Same settings as in-app generation (src/server/ai/sound.ts), which made the bundled walk/jump.
     body: JSON.stringify({ text: sound.prompt, duration_seconds: sound.durationSeconds, prompt_influence: 0.6, model_id: model }) });
   calls++;
   if (!response.ok) { console.error(`${name}: ElevenLabs HTTP ${response.status} ${await response.text()}`); process.exitCode = 1; continue; }

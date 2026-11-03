@@ -48,7 +48,7 @@ it("gives default moves the bundled sounds with no API call: idle silent, walk f
   expect(sound("walk")).toMatchObject({status:"ready",builtin:"/sounds/walk.mp3",frames:[0,2],requestedBy:"default"});
   const published=manifest();
   expect(published.actions.idle.sound).toBeUndefined();
-  expect(published.actions.walk.sound).toEqual({url:"/sounds/walk.mp3",frames:[0,2],volume:0.9});
+  expect(published.actions.walk.sound).toEqual({url:"/sounds/walk.mp3",frames:[0,2],volume:0.8});
   expect(published.actions.jump.sound).toMatchObject({url:"/sounds/jump.mp3",frames:[1]});
   expect(published.actions.crouch.sound?.url).toBe("/sounds/crouch.mp3");
   for(const name of ["walk","jump","crouch"])expect(existsSync(`public/sounds/${name}.mp3`)).toBe(true);
