@@ -35,7 +35,7 @@ export async function POST(request:Request) {
     const body=Buffer.concat(chunks);
     form=await new Response(new Uint8Array(body),{headers:{"Content-Type":request.headers.get("content-type") ?? ""}}).formData();
   } catch {return Response.json({error:"Send a multipart form with character details."},{status:400});}
-  const parsed=createCharacterSchema.safeParse(Object.fromEntries(["mode","name","description","viewType"].map(key=>[key,form.get(key) ?? ""])));
+  const parsed=createCharacterSchema.safeParse(Object.fromEntries(["mode","name","description"].map(key=>[key,form.get(key) ?? ""])));
   if(!parsed.success) return Response.json({error:parsed.error.issues[0].message},{status:400});
   const input=parsed.data;
   let png:Buffer|undefined;
@@ -58,7 +58,7 @@ export async function POST(request:Request) {
   try {key=chooseChromaKey(samples,input.description);} catch(error) {return Response.json({error:error instanceof Error ? error.message:"Could not select a safe background color"},{status:400});}
   const id=nanoid(),now=Date.now();
   const {db}=getDatabase();
-  db.insert(characters).values({id,name:input.name,description:input.description,viewType:input.viewType,styleJson:JSON.stringify({chromaKey:key,colorSamples:samples,logicalHeight:input.logicalHeight,paletteSize:24,outline:false,mirrorLeft:true}),createdAt:now,updatedAt:now}).run();
+  db.insert(characters).values({id,name:input.name,description:input.description,viewType:"side_scroller",styleJson:JSON.stringify({chromaKey:key,colorSamples:samples,logicalHeight:input.logicalHeight,paletteSize:24,outline:false,mirrorLeft:true}),createdAt:now,updatedAt:now}).run();
   try {
     if(png) {
       const meta=await sharp(png).metadata();

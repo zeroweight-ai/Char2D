@@ -1,10 +1,9 @@
-import { walkGuidance, walkPoses } from "./walk";
+import { legIdentityGuidance, walkGuidance, walkPoses, type LegIdentity } from "./walk";
 import { SHEET_RESOLUTION } from "@/lib/resolution";
 import { MAX_FRAMES_PER_STRIP } from "../presets";
-import type { Direction, ViewType } from "@/lib/manifest";
+import type { Direction } from "@/lib/manifest";
 
 export function stripPrompt(input: {
-  viewType?: ViewType;
   canvas?: "standard" | "wide" | "tall";
   label: string;
   actionKey?:string;
@@ -20,6 +19,8 @@ export function stripPrompt(input: {
   referenceHeight?:number;
   startFrame?:number;
   playback?: "loop" | "once" | "once_hold";
+  // Walk only: frame 1's legs described by appearance, for the frames 3–4 strip.
+  legIdentity?: LegIdentity|null;
 }) {
   if (input.poses.length < 1 || input.poses.length > MAX_FRAMES_PER_STRIP)
     throw new Error("Generate one to four frames per strip");
@@ -34,7 +35,7 @@ Create a SINGLE HORIZONTAL strip of exactly ${input.poses.length} full-body pixe
 
 CANVAS: ${input.canvas??"standard"}. ${input.canvas==="wide"?"Each slot is 1.65x standard width. Follow the offset body box in the SECOND reference; retain native character size and use the extra space for weapon reach and effects.":input.canvas==="tall"?"Each slot is 1.6x standard height. Follow the lowered body box in the SECOND reference and reserve the space overhead for the action. Preserve native character size; do not enlarge to fill the taller slot.":"Follow the reference body size."}
 
-CAMERA: ${input.viewType === "top_down" ? "Steep overhead top-down view" : input.viewType === "three_quarter" ? "Three-quarter view from a 45-degree elevated camera" : "Eye-level side view"}. Preserve the FIRST reference’s camera angle and perspective throughout the action.
+CAMERA: Eye-level side view. Preserve the FIRST reference’s camera angle and perspective throughout the action.
 
 1:1 REFERENCE LOCK (CRITICAL):
 - The FIRST reference is the accepted character sheet's direction anchor. You are animating THIS EXACT SPRITE—do NOT downscale, simplify, or redraw it in lower resolution.
@@ -62,7 +63,7 @@ ${!isWalk&&["idle","walk","jump","crouch"].includes(input.actionKey??input.label
 ` : ""}
 ${input.segment && input.actionReference && !isCustom ? `CROSS-STRIP CONTINUITY (CRITICAL):
 - ${input.idleReference?"The reference immediately before LAST":"The LAST reference"} is frame 1 of THIS action from the previous strip. Draw every pose in this strip at EXACTLY its character height, head size and pixel density — never larger, never zoomed in. Keep the whole body, including both feet and the top of the head, inside the canvas with clear margin.
-${isWalk ? "- WALK LEG ORDER: This strip continues the same walk cycle. Frame 3 is the leg-swapped opposite of that frame 1: the leg in FRONT in frame 1 must be BEHIND in frame 3, and the leg BEHIND in frame 1 must be in FRONT. Never repeat frame 1's leg layout.\n" : ""}
+${isWalk ? "- WALK LEG ORDER: This strip continues the same walk cycle. Frame 3 is the leg-swapped opposite of that frame 1: the leg in FRONT in frame 1 must be BEHIND in frame 3, and the leg BEHIND in frame 1 must be in FRONT. Never repeat frame 1's leg layout.\n"+(input.legIdentity?legIdentityGuidance(input.legIdentity):"- Frame 1 is a reference for size and identity ONLY. Do not copy its leg layout.\n") : ""}
 ` : ""}${isCustom ? `CUSTOM ACTION — FRAME-BY-FRAME CONSTRUCTION (CRITICAL):
 - SIZE LOCK: Use identical head size, torso width, limb thickness and native pixel density in EVERY action frame. A wider silhouette from an arm or weapon does not mean a larger character. Never enlarge later frames, zoom into the active swing or fit each pose independently to its slot.
 - WEAPON LENGTH LOCK: Preserve the reference weapon's complete hilt, guard and blade, including its blade-to-body length ratio, tip shape and thickness. Do not shorten, retract, bend or replace the weapon to fit the frame. For a horizontal slash keep the full blade visibly extended in the swing plane; do not foreshorten it into a stub.

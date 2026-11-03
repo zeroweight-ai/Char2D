@@ -2,7 +2,7 @@
 import { useEffect,useRef,useState } from "react";
 import type { Direction,Manifest } from "@/lib/manifest";
 import { previewViewport } from "@/lib/anim/viewport";
-export function SpritePlayer({manifest,action,direction,frame,flip=false,zoom="fit"}:{manifest:Manifest;action:string;direction:Direction;frame:number;flip?:boolean;zoom?:"fit"|"native"}) {
+export function SpritePlayer({manifest,action,direction,frame,flip=false,zoom="fit",ground}:{manifest:Manifest;action:string;direction:Direction;frame:number;flip?:boolean;zoom?:"fit"|"native";ground?:number|null}) {
   const host=useRef<HTMLDivElement>(null),canvas=useRef<HTMLCanvasElement>(null);
   const [size,setSize]=useState({width:512,height:384,dpr:1});
   const [atlas,setAtlas]=useState<HTMLImageElement|null>(null),[error,setError]=useState(false);
@@ -19,7 +19,7 @@ export function SpritePlayer({manifest,action,direction,frame,flip=false,zoom="f
   const selection=manifest.actions[action]?.directions[direction];
   const frames=selection?.mirrorOf?manifest.actions[action].directions[selection.mirrorOf]?.frames:selection?.frames;
   const rect=frames?.[Math.min(frame,frames.length-1)];
-  const viewport=previewViewport(manifest,size.width,size.height);
+  const viewport=previewViewport(manifest,size.width,size.height,ground);
   const renderScale=zoom==="native"?1:viewport.zoom*(rect?.scale??1);
   const cssWidth=zoom==="native"?Math.max(size.width,(rect?.w??0)+32):size.width;
   const cssHeight=zoom==="native"?Math.max(size.height,(rect?.h??0)+32):size.height;

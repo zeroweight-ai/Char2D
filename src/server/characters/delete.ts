@@ -1,5 +1,5 @@
 import "server-only";
-import { and,desc,eq,inArray } from "drizzle-orm";
+import { and,desc,eq,inArray,ne } from "drizzle-orm";
 import { getDatabase } from "../db";
 import { actions,actionVersions,assets,characters,characterSheets,jobs } from "../db/schema";
 import { JobQueue } from "../jobs/queue";
@@ -21,6 +21,7 @@ function liveAssetIds() {
     for(const id of Object.values(JSON.parse(sheet.anchorsJson)))if(typeof id==="string")live.add(id);
     for(const id of Object.values(JSON.parse(sheet.viewsJson)._runtimeAnchors??{}))if(typeof id==="string")live.add(id);
   }
+  for(const action of db.select({soundJson:actions.soundJson}).from(actions).all())collectAssetIds(JSON.parse(action.soundJson),live);
   for(const version of db.select().from(actionVersions).all()){
     collectAssetIds(JSON.parse(version.framesJson),live);collectAssetIds(JSON.parse(version.stripsJson),live);
   }
@@ -47,10 +48,11 @@ export function deleteAction(characterId:string,key:string) {
     if(!character)throw new DeleteError("Character not found",404);
     const action=db.select().from(actions).where(and(eq(actions.characterId,characterId),eq(actions.key,key))).get();
     if(!action)throw new DeleteError("Action not found",404);
-    if(db.select().from(jobs).where(and(eq(jobs.characterId,characterId),inArray(jobs.status,["queued","running"]))).get())throw new DeleteError("Generation is in progress. Wait for it to finish before deleting an action.");
+    if(db.select().from(jobs).where(and(eq(jobs.characterId,characterId),ne(jobs.type,"sound"),inArray(jobs.status,["queued","running"]))).get())throw new DeleteError("Generation is in progress. Wait for it to finish before deleting an action.");
     const versions=db.select().from(actionVersions).where(eq(actionVersions.actionId,action.id)).all();
     const versionIds=new Set(versions.map(v=>v.id)),candidateIds=new Set<string>();
     for(const version of versions){collectAssetIds(JSON.parse(version.framesJson),candidateIds);collectAssetIds(JSON.parse(version.stripsJson),candidateIds);}
+    collectAssetIds(JSON.parse(action.soundJson),candidateIds);
     // Old atlas/manifest snapshots contain the deleted action too. Retire them
     // and rebuild from remaining frame assets, with no model request.
     for(const asset of db.select().from(assets).where(and(eq(assets.characterId,characterId),inArray(assets.kind,["atlas","manifest"]))).all())candidateIds.add(asset.id);

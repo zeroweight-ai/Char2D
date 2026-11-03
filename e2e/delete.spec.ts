@@ -1,6 +1,6 @@
 import { expect,test } from "@playwright/test";
 test("confirms action deletion, rebuilds without idle, and deletes the character",async({page,request})=>{
-  const created=await request.post("/api/characters",{multipart:{mode:"prompt",name:`Delete test ${Date.now()}`,description:"green knight",viewType:"side_scroller"}});
+  const created=await request.post("/api/characters",{multipart:{mode:"prompt",name:`Delete test ${Date.now()}`,description:"green knight"}});
   expect(created.status()).toBe(202);const {id}=await created.json();
   await page.goto(`/characters/${id}`);await expect(page.getByRole("heading",{name:"Your transparent character sheet"})).toBeVisible({timeout:30_000});
   await page.getByRole("button",{name:"Looks good — accept sheet"}).click();await expect(page.getByTestId("hero-status")).toHaveText("Ready to play",{timeout:30_000});
@@ -31,7 +31,7 @@ test("confirms action deletion, rebuilds without idle, and deletes the character
 });
 test("deletes a character from the gallery only after confirmation",async({page,request})=>{
   const name=`Gallery delete ${Date.now()}`;
-  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name,description:"green knight",viewType:"top_down"}});const {id}=await response.json();
+  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name,description:"green knight"}});const {id}=await response.json();
   await page.goto(`/characters/${id}`);await expect(page.getByRole("heading",{name:"Your transparent character sheet"})).toBeVisible({timeout:30_000});
   await page.goto("/");
   const card=page.getByRole("article").filter({has:page.getByRole("heading",{name,exact:true})});

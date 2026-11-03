@@ -1,6 +1,5 @@
 "use client";
 import { CustomAction } from "./CustomAction";
-import { viewLabels } from "@/lib/manifest";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -11,7 +10,9 @@ import { AnimationPreview } from "./AnimationPreview";
 import { ControlsPanel } from "./ControlsPanel";
 import { heroStatus } from "./CharacterGallery";
 import { keyLabel } from "@/lib/bindings";
-import type { CharacterDetail } from "@/lib/character";
+import type { CharacterAction,CharacterDetail } from "@/lib/character";
+import { playSound } from "@/lib/anim/sound-player";
+const soundPending=(move:CharacterAction)=>move.sound?.status==="queued"||move.sound?.status==="generating";
 const TIPS=[
   "Tip: after this, you’ll review the sheet before any animation is made.",
   "Tip: a short note like “shorter cape” edits the sheet instead of starting over.",
@@ -37,7 +38,7 @@ export function CharacterSheet({id}:{id:string}) {
     const response=await fetch(`/api/characters/${encodeURIComponent(id)}`);
     if(!response.ok) throw new Error(response.status===404 ? "Character not found":"Could not load character");
     return response.json();
-  },refetchInterval:query=>query.state.data?.status==="generating" || (query.state.data?.animation?.running??0)>0 ? 1000:false});
+  },refetchInterval:query=>query.state.data?.status==="generating" || (query.state.data?.animation?.running??0)>0 || query.state.data?.animation?.actions.some(soundPending) ? 1000:false});
   const jobId=query.data?.job?.id;
   const jobStatus=query.data?.job?.status;
   useEffect(()=>{
@@ -77,9 +78,9 @@ export function CharacterSheet({id}:{id:string}) {
     } catch(error) {setError(error instanceof Error ? error.message:"Could not update sheet");}
     finally {setBusy(false);}
   }
-  async function actionRequest(path:string,fallback:string){
+  async function actionRequest(path:string,fallback:string,method:"POST"|"DELETE"="POST"){
     setBusy(true);setError("");
-    try{const response=await fetch(`/api/characters/${id}/${path}`,{method:"POST"});const value=await response.json();if(!response.ok)throw new Error(value.error??fallback);await refresh();}
+    try{const response=await fetch(`/api/characters/${id}/${path}`,{method});const value=await response.json();if(!response.ok)throw new Error(value.error??fallback);await refresh();}
     catch(error){setError(error instanceof Error?error.message:fallback);}finally{setBusy(false);}
   }
   if(query.isPending) return <section className="panel"><p role="status">Loading character…</p><progress aria-label="Loading character"/></section>;
@@ -94,7 +95,6 @@ export function CharacterSheet({id}:{id:string}) {
   const step=generating||!sheet?.processedAssetId?0:!accepted?1:!workspace||animating?2:3;
   const animationsLocked=busy||(anim?.running??0)>0;
   const status=heroStatus(character);
-  const defaults=character.viewType==="side_scroller"?"idle, walk, jump and crouch":"idle and walk";
   const fileName=character.name.replace(/[^a-z0-9_-]/gi,"-");
   const canRevise=!generating && !animating && !anim?.running;
 
@@ -119,7 +119,7 @@ export function CharacterSheet({id}:{id:string}) {
     {sheet?.warnings?.map(warning=><p className="muted" key={warning}>{warning}</p>)}
     {strategy}
     {sheetImage}
-    <div className="review-actions"><button className="big" disabled={busy} onClick={()=>action("accept")}>Looks good — accept sheet</button><p className="fine-print">Next, Muse animates {defaults}. That uses about {character.viewType==="side_scroller"?"4–8":"6–12"} image calls.</p></div>
+    <div className="review-actions"><button className="big" disabled={busy} onClick={()=>action("accept")}>Looks good — accept sheet</button><p className="fine-print">Next, Muse animates idle, walk, jump and crouch. That uses about 4–8 image calls.</p></div>
     {reprocessButton}
     {revision("Not quite right?","Describe a fix to edit this sheet, or leave it empty for a fresh variation. Uses one image generation.")}
   </section>;
@@ -140,13 +140,24 @@ export function CharacterSheet({id}:{id:string}) {
 
   const movesPanel=anim&&<section className="panel" aria-labelledby="moves-list-title">
     <div className="panel-title"><h2 id="moves-list-title">Your moves</h2></div>
-    <p className="muted">Regenerate redraws a move with Muse. Earlier versions are kept: switch back from Play → Edit move.</p>
+    <p className="muted">Regenerate redraws a move with Muse. Earlier versions are kept: switch back from Play → Edit move. Walk, jump and crouch come with built-in sounds; new moves get one from the AI when they need it.{character.soundAvailable?" Use Add sound / New sound to make a different one.":""}</p>
+    {!character.soundAvailable&&<p className="fine-print">Making new sounds is off. Add ELEVENLABS_API_KEY to .env and restart to generate sounds for new moves.</p>}
     <ul className="move-rows">{anim.actions.map(move=>{
       const keys=character.bindings?.p1[move.key]??[];
       const count=move.versions?.filter(version=>version.status==="ready").length??1;
+      const sound=move.sound,pending=soundPending(move),soundPath=`actions/${encodeURIComponent(move.key)}/sound`;
+      const soundNote=!sound?null:pending?<span className="pill running">♪ Making sound…</span>
+        :sound.url?<span className="sound-note" title={sound.prompt??undefined}>♪ {sound.requestedBy==="user"?"Sound added":sound.requestedBy==="default"?"Built-in sound":"Sound"}{sound.frames.length?` on frame ${sound.frames.map(f=>f+1).join(" & ")}`:""}</span>
+        :sound.status==="none"?<span className="sound-note muted">No sound{sound.reason?`: ${sound.reason}`:""}</span>:null;
+      const soundButtons=sound&&!pending&&move.activeVersionId&&<>
+        {sound.url&&<button className="quiet-button" aria-label={`Play ${move.label} sound`} onClick={()=>void playSound(sound.url!,0.8,{force:true})}>▶ Sound</button>}
+        {character.soundAvailable&&<button className="quiet-button" disabled={busy} aria-label={`${sound.url?"Regenerate":"Generate"} ${move.label} sound`} title="Uses one ElevenLabs sound generation." onClick={()=>actionRequest(soundPath,"Could not make the sound")}>{sound.url?"New sound":"Add sound"}</button>}
+        {sound.url&&<button className="quiet-button" disabled={busy} aria-label={`Remove ${move.label} sound`} onClick={()=>actionRequest(soundPath,"Could not remove the sound","DELETE")}>Mute</button>}
+      </>;
       return <li className="move-row" key={move.key}>
-        <div className="move-name"><h3>{move.label}</h3><span className="move-meta">{keys.length>0&&<span>{keys.map(code=><span className="key" key={code}>{keyLabel(code)}</span>)}</span>}<span>Version {move.activeVersion??move.version}{count>1?` · ${count} saved`:""}</span>{move.status!=="ready"&&<span className={`pill ${move.status==="error"?"error":"running"}`}>{move.status==="error"?"Failed":"Working…"}</span>}</span>{move.error&&<span className="error">{move.error}</span>}</div>
+        <div className="move-name"><h3>{move.label}</h3><span className="move-meta">{keys.length>0&&<span>{keys.map(code=><span className="key" key={code}>{keyLabel(code)}</span>)}</span>}<span>Version {move.activeVersion??move.version}{count>1?` · ${count} saved`:""}</span>{move.status!=="ready"&&<span className={`pill ${move.status==="error"?"error":"running"}`}>{move.status==="error"?"Failed":"Working…"}</span>}{soundNote}</span>{move.error&&<span className="error">{move.error}</span>}{sound?.error&&!pending&&<span className="error">Sound: {sound.error}</span>}</div>
         <div className="move-row-actions">
+          {soundButtons}
           {!move.nativeResolution && <button className="quiet-button" disabled={animationsLocked} aria-label={`Restore native frames: ${move.label} (no AI call)`} title="Re-extract the saved frames at full resolution. No AI call." onClick={()=>actionRequest(`actions/${encodeURIComponent(move.key)}/reprocess`,"Could not restore action frames")}>Fix resolution</button>}
           <button className="secondary small" disabled={animationsLocked} aria-label={`Regenerate ${move.label}`} onClick={()=>actionRequest(`actions/${encodeURIComponent(move.key)}/regenerate`,"Could not regenerate action")}>Regenerate</button>
           <DeleteButton quiet text="Delete" label={`Delete ${move.label}`} title={`Delete ${move.label}?`} description="This removes the move, all its versions and its keys. The sprite atlas is rebuilt without an AI call." endpoint={`/api/characters/${id}/actions/${encodeURIComponent(move.key)}`} disabled={animationsLocked} onDeleted={refresh}/>
@@ -181,7 +192,7 @@ export function CharacterSheet({id}:{id:string}) {
       <div className="hud-portrait">{sheet?.processedAssetId&&!generating?<Image src={`/api/assets/${sheet.processedAssetId}`} alt="" width={96} height={96} unoptimized/>:<span aria-hidden="true">?</span>}</div>
       <div>
         <h1>{character.name}</h1>
-        <div className="hud-stats"><span className={`pill ${status.tone}`} data-testid="hero-status">{status.label}</span><span className="badge">{viewLabels[character.viewType]}</span>{moves>0&&<span className="badge">{moves} move{moves===1?"":"s"}</span>}</div>
+        <div className="hud-stats"><span className={`pill ${status.tone}`} data-testid="hero-status">{status.label}</span>{moves>0&&<span className="badge">{moves} move{moves===1?"":"s"}</span>}</div>
       </div>
       <div className="hud-actions">
         {character.manifest&&<details className="menu"><summary className="button small">Export ▾</summary><div className="menu-list" onClick={event=>{const menu=event.currentTarget.closest("details");if(menu)menu.open=false;}}>

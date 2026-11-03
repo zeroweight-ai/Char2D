@@ -2,7 +2,7 @@ import { expect,test,type APIRequestContext,type Page } from "@playwright/test";
 // Phase 3 acceptance: every default action plays from chips and keys, retiming
 // persists, undo/redo between versions works, and bindings detect conflicts.
 async function readyHero(page:Page,request:APIRequestContext,name:string) {
-  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name:`${name} ${Date.now()}`,description:"green knight",viewType:"side_scroller"}});
+  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name:`${name} ${Date.now()}`,description:"green knight"}});
   expect(response.status()).toBe(202);const {id}=await response.json();
   await page.goto(`/characters/${id}`);
   await page.getByRole("button",{name:"Looks good — accept sheet"}).click({timeout:30_000});
@@ -18,6 +18,8 @@ test("default actions play from keys with the saved bindings",async({page,reques
   expect(bindings.p2).toMatchObject({jump:["ArrowUp"],crouch:["ArrowDown"]});
   const canvas=page.getByTestId("sprite-player"),stage=page.getByRole("group",{name:"Animation stage, keyboard controls"});
   for(const [label,key] of [["Walk","walk"],["Jump","jump"],["Crouch","crouch"],["Idle","idle"]]){await page.getByRole("button",{name:label,exact:true}).click();await expect(canvas).toHaveAttribute("data-action",key);}
+  // Clicking Jump behaves like its key: it plays once, then returns to idle.
+  await page.getByRole("button",{name:"Jump",exact:true}).click();await expect(canvas).toHaveAttribute("data-action","jump");await expect(canvas).toHaveAttribute("data-action","idle",{timeout:5_000});
   await stage.focus();
   await page.keyboard.down("KeyD");await expect(canvas).toHaveAttribute("data-action","walk");await expect(canvas).toHaveAttribute("data-direction","right");await page.keyboard.up("KeyD");await expect(canvas).toHaveAttribute("data-action","idle");
   await page.keyboard.down("KeyS");await expect(canvas).toHaveAttribute("data-action","crouch");await page.keyboard.up("KeyS");await expect(canvas).toHaveAttribute("data-action","idle");
@@ -63,7 +65,8 @@ test("retiming persists without an AI call, and undo/redo switches versions",asy
   expect(undone.manifest.atlas.version).toBe(atlasBefore+1);
   // v1 kept its own retimed durations.
   expect(undone.manifest.actions.walk.directions.right.frames[0].durationMs).toBe(380);
-  await page.getByRole("button",{name:"Walk",exact:true}).click();
+  // The preview remounts (back to Idle) when the new atlas arrives; reload so it has.
+  await page.reload();await page.getByRole("button",{name:"Walk",exact:true}).click();await page.getByRole("button",{name:"Edit move",exact:true}).click();
   await page.getByRole("button",{name:"Redo to v2",exact:true}).click();
   await expect.poll(async()=>{const value=await detail(request,id);return value.status==="ready"&&value.animation.actions.find((a:{key:string})=>a.key==="walk").activeVersion;},{timeout:30_000}).toBe(2);
 });
@@ -93,4 +96,20 @@ test("rebinding detects conflicts, offers a swap, and drives the stage",async({p
   await page.keyboard.press("Backspace");await expect(dialog).toBeHidden();
   await page.reload();
   await expect.poll(async()=>(await detail(request,id)).bindings.p1.crouch).toEqual(["KeyS"]);
+});
+
+test("the AI picks sounds per move, and a silent move can be given one",async({page,request})=>{
+  const id=await readyHero(page,request,"Sound");
+  const sounds=async()=>Object.fromEntries((await detail(request,id)).animation.actions.map((a:{key:string;sound:{status:string}})=>[a.key,a.sound.status]));
+  await expect.poll(sounds,{timeout:30_000}).toMatchObject({idle:"none",walk:"ready",jump:"ready"});
+  expect((await detail(request,id)).manifest.actions.walk.sound.frames).toEqual([0,2]);
+  await page.reload();
+  await expect(page.getByRole("button",{name:"Mute sound",exact:true})).toBeVisible();
+  await page.getByRole("tab",{name:"Moves"}).click();
+  await expect(page.getByRole("button",{name:"Play Walk sound",exact:true})).toBeVisible();
+  await page.getByRole("button",{name:"Generate Idle sound",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Play Idle sound",exact:true})).toBeVisible({timeout:30_000});
+  expect((await detail(request,id)).manifest.actions.idle.sound).toBeTruthy();
+  await page.getByRole("button",{name:"Remove Idle sound",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Generate Idle sound",exact:true})).toBeVisible();
 });

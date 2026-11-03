@@ -24,7 +24,7 @@ it("uses a fixed 128-pixel creation default while supporting existing 48/64-pixe
 it("targets the approved 1920×1280 sheet without a low-resolution logical grid", async()=>{
   const { sheetPrompt } = await import("../src/server/pipeline/prompts/sheet");
   const { stripLayout } = await import("../src/server/pipeline/guides");
-  const prompt=sheetPrompt("knight","side_scroller","#FF00FF",false);
+  const prompt=sheetPrompt("knight","#FF00FF",false);
   expect(prompt).toContain("1920×1280");
   expect(prompt).toContain("1126 pixels per standing character");
   expect(prompt).not.toContain("approximately 128-pixel-high logical grid");
@@ -34,24 +34,21 @@ it("targets the approved 1920×1280 sheet without a low-resolution logical grid"
 });
 
 
-it("keeps all three camera choices distinct through creation and generation prompts",async()=>{
+it("uses the eye-level side view everywhere, the only supported camera",async()=>{
   const { sheetPrompt }=await import("../src/server/pipeline/prompts/sheet");
   const { manifestSchema }=await import("../src/lib/manifest");
-  for(const viewType of ["side_scroller","top_down","three_quarter"] as const){
-    expect(createCharacterSchema.parse({name:"Knight",mode:"prompt",description:"green knight",viewType}).viewType).toBe(viewType);
-    const sheet=sheetPrompt("knight",viewType,"#FF00FF",false);
-    const strip=stripPrompt({viewType,label:"Walk",direction:"right",poses:["standing"],key:"#FF00FF",segment:0,total:1});
-    const camera=viewType==="side_scroller"?"eye-level":viewType==="top_down"?"steep overhead":"45-degree elevated camera";
-    expect(sheet.toLowerCase()).toContain(camera);
-    expect(strip.toLowerCase()).toContain(camera);
-    expect(manifestSchema.shape.viewType.parse(viewType)).toBe(viewType);
-  }
+  expect(createCharacterSchema.parse({name:"Knight",mode:"prompt",description:"green knight"})).not.toHaveProperty("viewType");
+  const sheet=sheetPrompt("knight","#FF00FF",false);
+  const strip=stripPrompt({label:"Walk",direction:"right",poses:["standing"],key:"#FF00FF",segment:0,total:1});
+  for(const text of [sheet,strip]){expect(text.toLowerCase()).toContain("eye-level side view");expect(text).not.toMatch(/top-down|overhead camera|three-quarter/i);}
+  expect(manifestSchema.shape.viewType.parse("side_scroller")).toBe("side_scroller");
+  expect(manifestSchema.shape.viewType.safeParse("top_down").success).toBe(false);
 });
 
 it("gives every basic action a complete per-frame body plan within the frame limit",async()=>{
   const { defaultPresets }=await import("../src/server/pipeline/presets");
   const { actionPlanSchema }=await import("../src/lib/manifest");
-  for(const action of defaultPresets("side_scroller")){
+  for(const action of defaultPresets()){
     expect(actionPlanSchema.safeParse(action.plan).success).toBe(true);
     for(const pose of action.plan.poses){
       expect(pose).toMatch(/torso|chest/);
@@ -105,15 +102,11 @@ it("uses the continuous near/far Walk cycle even when regenerating an older plan
   expect(continuation).not.toContain("Action frame 3 of 4: Contact A");
 });
 
-it("defaults every camera to Right Side, Front, Behind and preserves legacy anchor order",async()=>{
+it("lays the sheet out as Right Side, Front, Behind",async()=>{
   const {sheetPrompt,revisionSheetPrompt,sheetAnchorOrder}=await import("../src/server/pipeline/prompts/sheet");
-  for(const view of ["side_scroller","top_down","three_quarter"] as const){
-    const prompt=sheetPrompt("knight",view,"#FF00FF",false);
-    expect(prompt).toContain("Slot order: Right Side, Front, Behind.");
-    expect(sheetAnchorOrder(prompt,view)).toEqual(["right","down","up"]);
-    expect(sheetAnchorOrder("old sheet prompt",view)).toEqual(view==="side_scroller"?["right","down","up"]:["down","up","right"]);
-    expect(revisionSheetPrompt("knight",view,"#FF00FF","red hat","new_sheet",false)).toContain("Slot order: Right Side, Front, Behind.");
-  }
+  expect(sheetPrompt("knight","#FF00FF",false)).toContain("Slot order: Right Side, Front, Behind.");
+  expect(sheetAnchorOrder()).toEqual(["right","down","up"]);
+  expect(revisionSheetPrompt("knight","#FF00FF","red hat","new_sheet",false)).toContain("Slot order: Right Side, Front, Behind.");
 });
 
 it("keeps requested custom slash effects within direction-aware slot bounds",()=>{

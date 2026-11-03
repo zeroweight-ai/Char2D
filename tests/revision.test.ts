@@ -31,6 +31,6 @@ it("uses the latest sheet for edits, the original upload for fresh sheets, or no
   expect(()=>referenceForRevision("edit_latest",null,"original")).toThrow("missing");
 });
 it("makes the latest image authoritative for edits and lets new instructions override the original appearance on a fresh start",()=>{
-  expect(revisionSheetPrompt("green knight","side_scroller","#FF00FF","shorter cape","edit_latest",true)).toContain("authoritative appearance reference and includes prior revisions");
-  expect(revisionSheetPrompt("green knight","top_down","#FF00FF","start over","new_sheet",true)).toContain("Discard prior generated sheet designs");
+  expect(revisionSheetPrompt("green knight","#FF00FF","shorter cape","edit_latest",true)).toContain("authoritative appearance reference and includes prior revisions");
+  expect(revisionSheetPrompt("green knight","#FF00FF","start over","new_sheet",true)).toContain("Discard prior generated sheet designs");
 });

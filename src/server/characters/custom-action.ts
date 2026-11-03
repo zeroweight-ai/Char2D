@@ -1,5 +1,5 @@
 import "server-only";
-import { and,eq,inArray } from "drizzle-orm";
+import { and,eq,inArray,ne } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { customActionSchema } from "@/lib/custom-action";
 import { styleSchema } from "@/lib/character";
@@ -16,7 +16,7 @@ function context(characterId:string,sheetId?:string) {
   if(!character)throw new AnimationError("Character not found",404);
   const sheet=character.sheetId?db.select().from(characterSheets).where(and(eq(characterSheets.id,character.sheetId),eq(characterSheets.characterId,characterId))).get():null;
   if(sheet?.status!=="accepted"||!sheet.processedAssetId||sheetId&&sheet.id!==sheetId)throw new AnimationError("Accept the current character sheet before creating an action. Refresh if the sheet has changed.");
-  const directions=defaultPresets(character.viewType,styleSchema.parse(JSON.parse(character.styleJson)).mirrorLeft)[0].directions;
+  const directions=defaultPresets(styleSchema.parse(JSON.parse(character.styleJson)).mirrorLeft)[0].directions;
   return {character,sheet,directions};
 }
 export async function planCustomAction(characterId:string,prompt:string) {
@@ -74,7 +74,7 @@ Write each \`poses\` entry as a complete, self-contained static blueprint descri
 - Legs & Feet: BOTH legs (near-side and far-side), knee bend angles, and whether each foot is firmly planted on the shared baseline or lifted in the air.
 - Arms & Hands: BOTH arms, elbow bend angles, hand placement, and exact static angle/position of any held prop/weapon (plus explicit negative constraints against wrong-axis tilting or edge clipping).
 - Head & Expression: head facing, eye gaze, and mouth expression matching the effort of that phase.
-- Preserve the reference character's exact proportions, pixel density, nonhuman features, and outfit asymmetry. Keep camera and facing direction fixed.`,messages:[{role:"user",content:JSON.stringify({prompt,viewType:character.viewType,description:character.description,directions,existing})}]});
+- Preserve the reference character's exact proportions, pixel density, nonhuman features, and outfit asymmetry. Keep camera and facing direction fixed.`,messages:[{role:"user",content:JSON.stringify({prompt,camera:"side view",description:character.description,directions,existing})}]});
   const action=customActionSchema.parse(JSON.parse(result.text.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"")));
   if(existing.some(item=>item.key===action.key))throw new AnimationError("That action already exists. Describe a new action or regenerate the existing one.");
   return {action,sheetId:sheet.id,imageCalls:estimateStripCalls(sheet,action.plan.frames,directions,action.plan.canvas)};
@@ -83,7 +83,7 @@ export function createCustomAction(characterId:string,sheetId:string,input:unkno
   const action=customActionSchema.parse(input),{db,sqlite}=getDatabase();
   return sqlite.transaction(()=>{
     const {sheet,directions}=context(characterId,sheetId);
-    if(db.select().from(jobs).where(and(eq(jobs.characterId,characterId),inArray(jobs.status,["queued","running"]))).get())throw new AnimationError("Generation is in progress. Wait for it to finish before generating your custom action.");
+    if(db.select().from(jobs).where(and(eq(jobs.characterId,characterId),ne(jobs.type,"sound"),inArray(jobs.status,["queued","running"]))).get())throw new AnimationError("Generation is in progress. Wait for it to finish before generating your custom action.");
     const existing=db.select().from(actions).where(eq(actions.characterId,characterId)).orderBy(actions.sortOrder,actions.createdAt).all();
     if(existing.some(item=>item.key===action.key))throw new AnimationError("An action with that key already exists. Plan a new action.");
     const actionId=nanoid(),versionId=nanoid(),queue=new JobQueue();

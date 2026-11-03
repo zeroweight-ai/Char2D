@@ -38,19 +38,18 @@ beforeEach(async()=>{
 });
 afterEach(()=>{globalDb.char2dDb?.sqlite.close();globalDb.char2dDb=previous;rmSync(state.config.dataDir,{recursive:true,force:true});});
 async function drain(){const queue=new JobQueue();let count=0;for(let job=queue.claim("test");job;job=queue.claim("test")){await runAnimationJob(job,queue);queue.complete(job.id);if(++count>50)throw new Error("Job loop did not terminate");}}
-for(const view of ["side_scroller","top_down","three_quarter"] as const) {
-  it(`accepts a ${view} sheet once and generates valid aligned frames and an atlas`,async()=>{
-    getDatabase().db.update(characters).set({viewType:view}).where(eq(characters.id,"char")).run();
+{
+  it("accepts a sheet once and generates valid aligned frames and an atlas",async()=>{
     const first=acceptAndAnimate("char","sheet");
     expect(acceptAndAnimate("char","sheet")).toEqual({...first,alreadyQueued:true});
     expect(()=>queueSheet("char","new sheet",true)).toThrow(/already/);
     await drain();
-    expect(state.generate).toHaveBeenCalledTimes(view==="side_scroller"?4:6);
+    expect(state.generate).toHaveBeenCalledTimes(4);
     for(const [request] of state.generate.mock.calls){expect([2,3]).toContain(request.references.length);expect(Number(request.prompt.match(/Frame count: (\d+)/)[1])).toBeLessThanOrEqual(4);expect(request.references[0].equals(original)).toBe(false);expect(request.prompt).toMatch(/animate in place/i);}
     const character=getDatabase().db.select().from(characters).where(eq(characters.id,"char")).get()!;
     expect(character.status).toBe("ready");
     const manifest=manifestSchema.parse(JSON.parse(character.manifestJson!));
-    expect(Object.keys(manifest.actions)).toEqual(view==="side_scroller"?["idle","walk","jump","crouch"]:["idle","walk"]);
+    expect(Object.keys(manifest.actions)).toEqual(["idle","walk","jump","crouch"]);expect(manifest.viewType).toBe("side_scroller");
     expect(manifest.actions.walk.directions.left).toEqual({mirrorOf:"right"});
     expect(manifest.actions.walk.directions.right?.frames).toHaveLength(4);
     for(const action of Object.values(manifest.actions))for(const direction of Object.values(action.directions))for(const frame of direction.frames??[]){expect(frame.anchorY).toBeLessThanOrEqual(frame.h+16);expect(frame.w).toBeLessThan(64);expect(frame.h).toBeLessThan(80);expect(frame.durationMs).toBeGreaterThan(0);}
@@ -101,16 +100,16 @@ it("can start animations on a sheet accepted before animation support existed",(
   expect(getDatabase().db.select().from(jobs).all()).toHaveLength(10);
 });
 
-for(const view of ["side_scroller","top_down","three_quarter"] as const) {
-  it(`regenerates only walk for ${view}, preserving the active atlas until publication`,async()=>{
-    const {db}=getDatabase();db.update(characters).set({viewType:view}).where(eq(characters.id,"char")).run();
+{
+  it("regenerates only walk, preserving the active atlas until publication",async()=>{
+    const {db}=getDatabase();
     acceptAndAnimate("char","sheet");await drain();
     const {actions,inputBindings}=await import("../src/server/db/schema");
     const before=db.select().from(characters).where(eq(characters.id,"char")).get()!;
     const previous=db.select().from(actions).all();const bindings=db.select().from(inputBindings).all();
     const walk=previous.find(action=>action.key==="walk")!;
     const calls=state.generate.mock.calls.length;
-    const result=regenerateAction("char","walk");expect(result.imageCalls).toBe(view==="side_scroller"?1:3);
+    const result=regenerateAction("char","walk");expect(result.imageCalls).toBe(1);
     expect(db.select().from(characters).where(eq(characters.id,"char")).get()!.manifestJson).toBe(before.manifestJson);
     expect(db.select().from(actions).where(eq(actions.id,walk.id)).get()!.activeVersionId).toBe(walk.activeVersionId);
     expect(()=>regenerateAction("char","walk")).toThrow(/in progress/);

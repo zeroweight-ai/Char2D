@@ -39,7 +39,7 @@ async function drain(){const queue=new JobQueue();for(let job=queue.claim("test"
 async function ready(){acceptAndAnimate("char","sheet");await drain();}
 it("deletes character rows and unique files while preserving content-addressed files shared by another character",async()=>{
   await ready();const {db,sqlite}=getDatabase();
-  db.insert(characters).values({id:"other",name:"Other",viewType:"top_down",createdAt:1,updatedAt:1}).run();
+  db.insert(characters).values({id:"other",name:"Other",viewType:"side_scroller",createdAt:1,updatedAt:1}).run();
   const shared=await saveAsset(fixture,{characterId:"other",kind:"source",mime:"image/png"});
   const original=getDatabase().db.select().from(assets).where(eq(assets.id,db.select().from(characters).where(eq(characters.id,"char")).get()!.sourceAssetId!)).get()!;
   expect(shared.path).toBe(original.path);

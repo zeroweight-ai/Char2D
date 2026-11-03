@@ -1,5 +1,5 @@
 import "server-only";
-import { and,desc,eq,inArray } from "drizzle-orm";
+import { and,desc,eq,inArray,ne } from "drizzle-orm";
 import { getDatabase } from "../db";
 import { characters,characterSheets,jobs,assets } from "../db/schema";
 import { JobQueue } from "../jobs/queue";
@@ -13,7 +13,7 @@ export function reprocessSheet(characterId:string) {
     const sheet=character.sheetId?db.select().from(characterSheets).where(and(eq(characterSheets.id,character.sheetId),eq(characterSheets.characterId,characterId))).get():null;
     if(!sheet?.rawAssetId||!["error","ready","accepted"].includes(sheet.status))throw new ReprocessError("There is no saved sheet to process.");
     if(!db.select().from(assets).where(and(eq(assets.id,sheet.rawAssetId),eq(assets.characterId,characterId))).get())throw new ReprocessError("The saved sheet image is missing.");
-    if(db.select().from(jobs).where(and(eq(jobs.characterId,characterId),inArray(jobs.status,["queued","running"]))).get())throw new ReprocessError("Generation is already in progress.");
+    if(db.select().from(jobs).where(and(eq(jobs.characterId,characterId),ne(jobs.type,"sound"),inArray(jobs.status,["queued","running"]))).get())throw new ReprocessError("Generation is already in progress.");
     const old=db.select().from(jobs).where(and(eq(jobs.characterId,characterId),eq(jobs.type,"sheet"))).orderBy(desc(jobs.createdAt)).all().find(job=>JSON.parse(job.payloadJson).sheetId===sheet.id);
     const payload=sheetJobPayloadSchema.parse(old?JSON.parse(old.payloadJson):{sheetId:sheet.id});
     const processingKey=payload.processingKey??payload.generation?.chromaKey??sheet.prompt.match(/background key:\s*(#[0-9a-f]{6})/i)?.[1]??JSON.parse(character.styleJson).chromaKey;

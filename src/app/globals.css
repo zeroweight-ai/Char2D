@@ -70,11 +70,13 @@ code { font-family:var(--font-pixel); background:var(--paper-2); padding:1px 6px
 }
 .brand { display:flex; align-items:center; gap:12px; text-decoration:none; color:var(--ink); font-family:var(--font-pixel); font-size:1.35rem; font-weight:700; }
 .brand-mascot { width:34px; height:auto; image-rendering:pixelated; filter:drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff); }
-.brand-word { font-family:"Fredoka",var(--font-body); font-weight:700; font-size:1.6rem; letter-spacing:-.01em; background:var(--grad-brand); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 2px 0 rgb(255 255 255 / 85%)); }
+.brand-word { font-family:"Fredoka",var(--font-body); font-weight:700; font-size:1.6rem; letter-spacing:-.01em; background:var(--grad-brand); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff); }
 .site-header nav { display:flex; align-items:center; gap:clamp(14px,3vw,40px); font-family:var(--font-pixel); font-size:1.08rem; }
-.site-header nav a { color:var(--ink); text-decoration:none; position:relative; }
+/* White HUD-style text with a 2px dark pixel outline: readable on the light sky and the darkened title art. */
+.site-header nav a { color:#fff; font-weight:700; text-decoration:none; position:relative; text-shadow:2px 0 0 var(--ink),-2px 0 0 var(--ink),0 2px 0 var(--ink),0 -2px 0 var(--ink),2px 2px 0 var(--ink),-2px 2px 0 var(--ink),2px -2px 0 var(--ink),-2px -2px 0 var(--ink),0 4px 0 rgb(24 32 46 / 45%); }
+.site-header nav a:not(.nav-cta):hover { color:var(--gold-hi); }
 .site-header nav a:not(.nav-cta):hover::before { content:"▸"; position:absolute; left:-14px; }
-.site-header .nav-cta { margin:0 3px; padding:8px 18px; color:#fff; background:var(--ink); box-shadow:inset 0 -3px 0 #000, 0 0 0 2px var(--ink), 0 4px 0 rgb(24 32 46 / 35%); }
+.site-header .nav-cta { margin:0 3px; padding:8px 18px; color:#fff; background:var(--ink); text-shadow:none; box-shadow:inset 0 -3px 0 #000, 0 0 0 2px #fff, 0 0 0 4px var(--ink), 0 6px 0 rgb(24 32 46 / 35%); }
 .site-header .nav-cta:hover { background:var(--ink-2); }
 main { flex:1; width:100%; max-width:1160px; margin:0 auto; padding:calc(var(--header-h) + 8px) 24px 72px; }
 
@@ -180,7 +182,8 @@ progress::-moz-progress-bar { background:repeating-linear-gradient(90deg,var(--x
 .title-screen {
   position:relative; margin-top:calc((var(--header-h) + 8px) * -1); padding:calc(var(--header-h) + 4vh) 24px 0;
   min-height:min(100svh,980px); display:flex; flex-direction:column; align-items:center; text-align:center;
-  background:url("/game/title-world.png") center bottom / cover no-repeat, var(--sky-top);
+  /* Low-opacity black overlay so the logo, tagline and buttons stand out from the art. */
+  background:linear-gradient(rgb(0 0 0 / 25%),rgb(0 0 0 / 25%)), url("/game/title-world.png") center bottom / cover no-repeat, var(--sky-top);
   image-rendering:pixelated;
 }
 .title-stack { position:relative; margin-top:0; max-width:900px; }
@@ -192,7 +195,7 @@ progress::-moz-progress-bar { background:repeating-linear-gradient(90deg,var(--x
 }
 .bob-slow { animation:bob 4s ease-in-out infinite; }
 .footer-mascot { display:inline-block; width:20px; height:auto; vertical-align:-8px; margin-right:10px; image-rendering:pixelated; }
-.title-tagline { margin:20px auto 26px; max-width:620px; font-family:var(--font-pixel); font-size:clamp(1.2rem,2.6vw,1.75rem); line-height:1.35; color:var(--ink-2); text-shadow:0 2px 0 rgb(255 255 255 / 55%); }
+.title-tagline { margin:20px auto 26px; max-width:820px; text-wrap:balance; font-family:var(--font-pixel); font-size:clamp(1.2rem,2.6vw,1.75rem); line-height:1.35; color:#fff; text-shadow:0 2px 0 var(--ink); }
 .title-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; }
 .press-start { margin-top:16px; font-family:var(--font-pixel); color:#fff; letter-spacing:.2em; text-shadow:0 2px 0 var(--ink); }
 
@@ -512,7 +515,6 @@ button.quiet-button.danger:hover:not(:disabled) { color:var(--danger); }
 .form-step .step-head { margin-bottom:14px; }
 .form-step .step-no { width:36px; height:36px; font-size:1rem; }
 .creation-options.two { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-.creation-options.three { grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
 .option-card { padding:14px 14px 12px; gap:6px; }
 .option-card .option-icon { width:30px; height:30px; }
 .option-card.row { flex-direction:row; align-items:center; gap:14px; }
@@ -593,6 +595,7 @@ details.inspector-block[open]>summary h4::after { content:"▾"; }
 .move-name { display:flex; flex-direction:column; gap:2px; min-width:0; }
 .move-name h3 { font-size:1.1rem; }
 .move-meta { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; font-family:var(--font-pixel); font-size:.8rem; color:var(--text-muted); margin:0; }
+.sound-note { font-family:var(--font-body); max-width:46ch; }
 .move-row-actions { display:flex; align-items:center; flex-wrap:wrap; }
 .move-row-actions .small { margin:6px 10px 6px var(--px); }
 .warnings { margin-top:14px; font-size:.92rem; }
@@ -601,7 +604,6 @@ details.inspector-block[open]>summary h4::after { content:"▾"; }
 
 @media (max-width:900px) {
   .training.editing { grid-template-columns:minmax(0,1fr); }
-  .creation-options.three { grid-template-columns:minmax(0,1fr); }
 }
 @media (max-width:640px) {
   .creation-options.two { grid-template-columns:minmax(0,1fr); }

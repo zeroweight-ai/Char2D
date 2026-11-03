@@ -22,6 +22,7 @@
     "muse:image": "node --conditions=react-server --import tsx scripts/generate-muse-image.ts",
     "brand:build": "tsx scripts/build-brand.ts",
     "art:generate": "tsx scripts/generate-ui-art.ts",
+    "sounds:generate": "tsx scripts/generate-default-sounds.ts",
     "assets:clean-empty": "node --conditions=react-server --import tsx scripts/clean-empty-assets.ts"
   },
   "dependencies": {

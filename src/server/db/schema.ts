@@ -4,7 +4,8 @@ const createdAt = () => integer("created_at").notNull();
 const updatedAt = () => integer("updated_at").notNull();
 export const characters = sqliteTable("characters", {
   id: id(), name: text("name").notNull(), description: text("description").notNull().default(""),
-  viewType: text("view_type", { enum: ["side_scroller", "top_down", "three_quarter"] }).notNull(),
+  // Always "side_scroller" (the only supported view); kept for the manifest field.
+  viewType: text("view_type", { enum: ["side_scroller"] }).notNull(),
   status: text("status", { enum: ["draft", "generating", "ready", "error"] }).notNull().default("draft"),
   sourceAssetId: text("source_asset_id"), sheetId: text("sheet_id"), styleJson: text("style_json").notNull().default("{}"),
   paletteJson: text("palette_json").notNull().default("[]"), atlasAssetId: text("atlas_asset_id"), manifestJson: text("manifest_json"),
@@ -28,6 +29,8 @@ export const actions = sqliteTable("actions", {
   sortOrder: integer("sort_order").notNull().default(0),
   // Set once default key bindings were assigned, so a key the player cleared stays cleared.
   bindingsSeeded: integer("bindings_seeded", { mode: "boolean" }).notNull().default(false),
+  // Sound effect state (src/lib/sound.ts soundStateSchema). "{}" = not decided yet.
+  soundJson: text("sound_json").notNull().default("{}"),
   createdAt: createdAt(), updatedAt: updatedAt(),
 }, t => [uniqueIndex("action_key").on(t.characterId,t.key)]);
 export const actionVersions = sqliteTable("action_versions", {
@@ -48,7 +51,7 @@ export const chatMessages = sqliteTable("chat_messages", {
   toolCallsJson: text("tool_calls_json"), attachmentsJson: text("attachments_json"), createdAt: createdAt(),
 });
 export const jobs = sqliteTable("jobs", {
-  id: id(), type: text("type", { enum: ["demo", "sheet", "strip", "process_action", "compose_atlas", "export"] }).notNull(),
+  id: id(), type: text("type", { enum: ["demo", "sheet", "strip", "process_action", "compose_atlas", "export", "sound"] }).notNull(),
   characterId: text("character_id").references(() => characters.id, { onDelete: "cascade" }),
   actionVersionId: text("action_version_id").references(() => actionVersions.id, { onDelete: "cascade" }), payloadJson: text("payload_json").notNull().default("{}"),
   status: text("status", { enum: ["queued", "running", "done", "error", "cancelled"] }).notNull().default("queued"),
@@ -61,12 +64,12 @@ export const jobEvents = sqliteTable("job_events", {
   characterId: text("character_id"), kind: text("kind").notNull(), dataJson: text("data_json").notNull(), createdAt: createdAt(),
 }, t => [index("event_character").on(t.characterId,t.id)]);
 export const aiCalls = sqliteTable("ai_calls", {
-  id: id(), kind: text("kind", { enum: ["chat", "image"] }).notNull(), model: text("model").notNull(), requestHash: text("request_hash").notNull(),
+  id: id(), kind: text("kind", { enum: ["chat", "image", "sound"] }).notNull(), model: text("model").notNull(), requestHash: text("request_hash").notNull(),
   latencyMs: integer("latency_ms").notNull(), usageJson: text("usage_json"), ok: integer("ok", { mode: "boolean" }).notNull(),
   error: text("error"), createdAt: createdAt(),
 });
 export const playgroundScenes = sqliteTable("playground_scenes", {
-  id: id(), world: text("world", { enum: ["side_scroller", "top_down"] }).notNull(), name: text("name").notNull(), charactersJson: text("characters_json").notNull(), createdAt: createdAt(),
+  id: id(), world: text("world", { enum: ["side_scroller"] }).notNull(), name: text("name").notNull(), charactersJson: text("characters_json").notNull(), createdAt: createdAt(),
 });
 // Active sheet/version/atlas pointers are intentionally application-managed to avoid
 // circular creation dependencies. Ownership must be checked by future repositories.

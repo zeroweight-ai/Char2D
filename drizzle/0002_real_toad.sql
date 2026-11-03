@@ -1,0 +1,1 @@
+ALTER TABLE `actions` ADD `sound_json` text DEFAULT '{}' NOT NULL;

@@ -7,7 +7,7 @@ for(const mode of ["prompt","upload"] as const) {
     await page.getByRole("radio",{name:mode==="prompt" ? /Describe a character/:/Upload an image/}).check();
     await expect(page.getByLabel("Character pixel height",{exact:true})).toHaveCount(0);
     await page.getByLabel("Character name").fill(`${mode} knight ${Date.now()}`);
-    await page.getByLabel(mode==="prompt" ? "Describe your character":"Appearance notes (optional)").fill("A knight with green clothing and steel armor");
+    if(mode==="prompt") await page.getByLabel("Describe your character").fill("A knight with green clothing and steel armor");
     if(mode==="upload") await page.getByLabel("Character image",{exact:true}).setInputFiles("tests/fixtures/demo-sheet.png");
     await page.getByRole("button",{name:"Generate character sheet"}).click();
     await expect(page).toHaveURL(/\/characters\//);
@@ -47,30 +47,29 @@ for(const mode of ["prompt","upload"] as const) {
   });
 }
 test("rejects invalid creation input and invalid upload bytes",async({request})=>{
-  const noPrompt=await request.post("/api/characters",{multipart:{mode:"prompt",name:"Knight",description:"",viewType:"side_scroller"}});
+  const noPrompt=await request.post("/api/characters",{multipart:{mode:"prompt",name:"Knight",description:""}});
   expect(noPrompt.status()).toBe(400);
-  const badUpload=await request.post("/api/characters",{multipart:{mode:"upload",name:"Knight",description:"",viewType:"side_scroller",image:{name:"bad.png",mimeType:"image/png",buffer:Buffer.from("not an image")}}});
+  const badUpload=await request.post("/api/characters",{multipart:{mode:"upload",name:"Knight",description:"",image:{name:"bad.png",mimeType:"image/png",buffer:Buffer.from("not an image")}}});
   expect(badUpload.status()).toBe(400);
 });
 
 
-test("selects three-quarter view before generating and preserves it through animations",async({page,request})=>{
+test("creates side-view characters only, with no view picker or appearance notes",async({page,request})=>{
   await page.goto("/create");
-  await expect(page.getByRole("radio",{name:/Side view/})).toBeChecked();
-  await expect(page.getByRole("radio",{name:/Top-down view/})).toBeVisible();
-  await page.getByRole("radio",{name:/Three-quarter view/}).check();
+  await expect(page.getByRole("radio",{name:/Side view|Top-down view|Three-quarter view/})).toHaveCount(0);
+  await expect(page.getByText("Pick a game view")).toHaveCount(0);
+  await page.getByRole("radio",{name:/Upload an image/}).check();
+  await expect(page.getByText("Appearance notes (optional)")).toHaveCount(0);
   await page.getByRole("radio",{name:/Describe a character/}).check();
-  await page.getByLabel("Character name").fill(`Quarter knight ${Date.now()}`);
+  await page.getByLabel("Character name").fill(`Side knight ${Date.now()}`);
   await page.getByLabel("Describe your character").fill("green knight");
   await page.getByRole("button",{name:"Generate character sheet"}).click();
   await expect(page).toHaveURL(/\/characters\//);
-  await expect(page.getByRole("heading",{name:"Your transparent character sheet"})).toBeVisible({timeout:30_000});
-  const endpoint=new URL(page.url()).pathname.replace("/characters/","/api/characters/");
-  expect((await (await request.get(endpoint)).json()).viewType).toBe("three_quarter");
-  await page.getByRole("button",{name:"Looks good — accept sheet"}).click();
+  await page.getByRole("button",{name:"Looks good — accept sheet"}).click({timeout:30_000});
   await expect(page.getByTestId("hero-status")).toHaveText("Ready to play",{timeout:30_000});
+  const endpoint=new URL(page.url()).pathname.replace("/characters/","/api/characters/");
   const detail=await (await request.get(endpoint)).json();
-  expect(detail.manifest.viewType).toBe("three_quarter");
-  expect(detail.manifest.actions.walk.directions.up.frames).toHaveLength(4); // MAX_FRAMES_PER_ACTION
-  await expect(page.getByTestId("sprite-player")).toHaveAttribute("data-direction","down");
+  expect(detail.manifest.viewType).toBe("side_scroller");
+  expect(Object.keys(detail.manifest.actions)).toEqual(["idle","walk","jump","crouch"]);
+  await expect(page.getByTestId("sprite-player")).toHaveAttribute("data-direction","right");
 });

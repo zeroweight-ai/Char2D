@@ -1,0 +1,93 @@
+import { afterEach,beforeEach,expect,it,vi } from "vitest";
+import { mkdtempSync,rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { readFile } from "node:fs/promises";
+import sharp from "sharp";
+import { eq } from "drizzle-orm";
+const state=vi.hoisted(()=>({config:{dataDir:""},generate:vi.fn(),chat:vi.fn()}));
+vi.mock("../src/server/config",()=>({config:state.config}));
+vi.mock("../src/server/ai",()=>({provider:{generate:state.generate,chat:state.chat}}));
+import { getDatabase,openDatabase } from "../src/server/db";
+import { actions,actionVersions,characters,characterSheets,jobEvents } from "../src/server/db/schema";
+import { saveAsset,readAsset } from "../src/server/storage/assets";
+import { FakeProvider } from "../src/server/ai/fake";
+import { acceptAndAnimate,regenerateAction } from "../src/server/characters/animations";
+import { JobQueue } from "../src/server/jobs/queue";
+import { runAnimationJob } from "../src/server/pipeline/animations";
+import { removeChroma } from "../src/server/pixel/chroma";
+import { stripsSchema,framesSchema } from "../src/server/pipeline/animation-types";
+import { checkWalkLegs } from "../src/server/pipeline/walk-check";
+import { stripPrompt } from "../src/server/pipeline/prompts/strip";
+import { walkPoses,walkRepairPrompt } from "../src/server/pipeline/prompts/walk";
+const globalDb=globalThis as typeof globalThis & {char2dDb?:ReturnType<typeof openDatabase>};
+let previous:ReturnType<typeof openDatabase>|undefined;
+const answer=(frames:{front?:string;lifted?:string}[])=>({text:JSON.stringify({legA:"pale bare leg",legB:"dark stocking leg",distinguishable:true,frames:frames.map((f,i)=>({frame:i+1,...f}))})});
+const WRONG=answer([{front:"A"},{lifted:"A"},{front:"A"},{lifted:"A"}]),RIGHT=answer([{front:"A"},{lifted:"B"},{front:"B"},{lifted:"A"}]);
+beforeEach(async()=>{
+  state.config.dataDir=mkdtempSync(join(tmpdir(),"char2d-walk-"));previous=globalDb.char2dDb;globalDb.char2dDb=openDatabase(state.config.dataDir);
+  const fixture=await readFile("tests/fixtures/demo-sheet.png");
+  const decoded=await sharp(fixture).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+  const keyed=removeChroma(decoded.data,decoded.info.width,decoded.info.height,"#FF00FF");
+  const png=await sharp(keyed.rgba,{raw:{width:decoded.info.width,height:decoded.info.height,channels:4}}).png().toBuffer();
+  const {db}=getDatabase();
+  db.insert(characters).values({id:"char",name:"Hsin",description:"fox girl",viewType:"side_scroller",sheetId:"sheet",styleJson:JSON.stringify({chromaKey:"#FF00FF",logicalHeight:48}),createdAt:1,updatedAt:1}).run();
+  const asset=await saveAsset(png,{characterId:"char",kind:"sheet_transparent",mime:"image/png"});
+  db.insert(characterSheets).values({id:"sheet",characterId:"char",version:1,status:"ready",processedAssetId:asset.id,prompt:"accepted pixel character",createdAt:1}).run();
+  state.generate.mockReset().mockImplementation(request=>new FakeProvider().generate(request));
+  state.chat.mockReset();
+});
+afterEach(()=>{globalDb.char2dDb?.sqlite.close();globalDb.char2dDb=previous;rmSync(state.config.dataDir,{recursive:true,force:true});});
+async function drain(){const queue=new JobQueue();let count=0;for(let job=queue.claim("test");job;job=queue.claim("test")){await runAnimationJob(job,queue);queue.complete(job.id);if(++count>60)throw new Error("Job loop did not terminate");}}
+const walkVersion=()=>{const {db}=getDatabase();const walk=db.select().from(actions).where(eq(actions.key,"walk")).get()!;return db.select().from(actionVersions).where(eq(actionVersions.id,walk.activeVersionId!)).get()!;};
+const repairCalls=()=>state.generate.mock.calls.filter(([request])=>request.prompt.includes("Char2D walk frame repair"));
+const warnings=()=>getDatabase().db.select().from(jobEvents).where(eq(jobEvents.kind,"qa")).all().flatMap(row=>JSON.parse(row.dataJson).warnings as string[]);
+
+it("flags only frames whose leg differs from a correct cycle, relative to frame 1",async()=>{
+  const frame=await sharp({create:{width:10,height:20,channels:4,background:"#ff0000"}}).png().toBuffer();
+  const check=await checkWalkLegs({chat:async()=>WRONG},[frame,frame,frame,frame],"right");
+  expect(check.wrong).toEqual([1,2]);expect(check.legs.front).toBe("pale bare leg");
+  const unclear=answer([{front:"A"},{lifted:"unclear"},{front:"B"},{lifted:"none"}]);
+  expect((await checkWalkLegs({chat:async()=>unclear},[frame,frame,frame,frame],"right")).wrong).toEqual([]);
+  const same={text:JSON.stringify({...JSON.parse(WRONG.text),distinguishable:false})};
+  expect((await checkWalkLegs({chat:async()=>same},[frame,frame,frame,frame],"right")).wrong).toEqual([]);
+});
+it("redraws only the wrong walk frames, keeps verified repairs, and re-applies them on reprocess without AI",async()=>{
+  let checks=0;state.chat.mockImplementation(async request=>request.system.includes("walk-cycle checker")?(checks++===0?WRONG:RIGHT):{text:"{}"});
+  acceptAndAnimate("char","sheet");await drain();
+  expect(repairCalls()).toHaveLength(2);
+  const [[repair]]=repairCalls();
+  expect(repair.prompt).toContain("pale bare leg");expect(repair.references).toHaveLength(2);
+  const version=walkVersion(),strips=stripsSchema.parse(JSON.parse(version.stripsJson)).right!;
+  expect(strips.filter(item=>item.replacesFrame!==undefined&&!item.invalid).map(item=>item.replacesFrame)).toEqual([1,2]);
+  expect(warnings().filter(w=>/wrong leg/.test(w))).toEqual([]);
+  const frames=framesSchema.parse(JSON.parse(version.framesJson)).right!;
+  const sha=async(id:string)=>(await readAsset(id))!.asset.sha256;
+  const calls=state.generate.mock.calls.length;
+  regenerateAction("char","walk","reprocess");await drain();
+  expect(state.generate.mock.calls.length).toBe(calls);
+  const again=framesSchema.parse(JSON.parse(walkVersion().framesJson)).right!;
+  for(let i=0;i<4;i++)expect(await sha(again[i].assetId)).toBe(await sha(frames[i].assetId));
+});
+it("keeps Muse's original frame and warns when the redraw is still wrong after two tries",async()=>{
+  state.chat.mockImplementation(async request=>request.system.includes("walk-cycle checker")?WRONG:{text:"{}"});
+  acceptAndAnimate("char","sheet");await drain();
+  expect(repairCalls()).toHaveLength(4);
+  const strips=stripsSchema.parse(JSON.parse(walkVersion().stripsJson)).right!;
+  expect(strips.filter(item=>item.replacesFrame!==undefined).every(item=>item.invalid)).toBe(true);
+  expect(warnings().filter(w=>/frame [23] still has the wrong leg/.test(w))).toHaveLength(2);
+});
+it("falls back to the free colour check when the vision model is unavailable",async()=>{
+  state.chat.mockRejectedValue(new Error("offline"));
+  acceptAndAnimate("char","sheet");await drain();
+  expect(repairCalls()).toHaveLength(0);expect(walkVersion().status).toBe("ready");
+});
+it("tells the frames 3–4 strip exactly which leg goes where, and never to copy frame 1's legs",()=>{
+  const base={canvas:"standard" as const,viewType:"side_scroller" as const,label:"Walk",actionKey:"walk",playback:"loop" as const,key:"#00FFFF",total:4,direction:"right" as const,poses:walkPoses.slice(2),segment:1,startFrame:3,idleReference:true,actionReference:true};
+  const prompt=stripPrompt({...base,legIdentity:{front:"the pale bare leg",back:"the dark stocking leg"}});
+  expect(prompt).toContain("Frame 3: the dark stocking leg — now stepped FORWARD");
+  expect(prompt).toContain("Do not copy its leg layout");
+  expect(stripPrompt(base)).toContain("Do not copy its leg layout");
+  expect(stripPrompt({...base,segment:0,startFrame:1,poses:walkPoses.slice(0,2)})).toContain("LEG SCHEDULE");
+  expect(walkRepairPrompt({frameIndex:2,legs:null,direction:"right",key:"#00FFFF"})).toMatch(/Frame count: 1[\s\S]*LEG B \(the FAR-SIDE leg: the character’s LEFT leg/);
+});

@@ -2,7 +2,7 @@ import { expect,test } from "@playwright/test";
 import Database from "better-sqlite3";
 import { resolve } from "node:path";
 test("retries processing a saved failed sheet without replacing its raw image",async({page,request})=>{
-  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name:`Saved retry ${Date.now()}`,description:"green knight",viewType:"side_scroller"}});const {id}=await response.json();
+  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name:`Saved retry ${Date.now()}`,description:"green knight"}});const {id}=await response.json();
   await page.goto(`/characters/${id}`);await expect(page.getByRole("heading",{name:"Your transparent character sheet"})).toBeVisible({timeout:30_000});
   const before=await (await request.get(`/api/characters/${id}`)).json();
   // Simulate a processing failure in the isolated Playwright database, retaining

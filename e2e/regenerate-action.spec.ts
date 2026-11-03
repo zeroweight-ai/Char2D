@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { resolve } from "node:path";
 import { expect,test } from "@playwright/test";
 test("regenerates one action from its button and publishes a new atlas",async({page,request})=>{
-  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name:`Regenerate walk ${Date.now()}`,description:"green knight",viewType:"side_scroller"}});
+  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name:`Regenerate walk ${Date.now()}`,description:"green knight"}});
   expect(response.status()).toBe(202);const {id}=await response.json();
   await page.goto(`/characters/${id}`);await expect(page.getByRole("heading",{name:"Your transparent character sheet"})).toBeVisible({timeout:30_000});
   await page.getByRole("button",{name:"Looks good — accept sheet"}).click();await expect(page.getByTestId("hero-status")).toHaveText("Ready to play",{timeout:30_000});

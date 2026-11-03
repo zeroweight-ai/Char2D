@@ -1,7 +1,8 @@
 import "server-only";
 import sharp from "sharp";
 import type { Pose } from "./frames";
-export type NativePose=Pose&{scale:number;baseline:number;airborne:boolean};
+// batch: which generated strip the pose came from (frames of one strip share a scale).
+export type NativePose=Pose&{scale:number;baseline:number;airborne:boolean;batch?:number};
 export async function preserveNativeFrames(poses:NativePose[]) {
   return Promise.all(poses.map(async pose=>{
     const {data,info}=await sharp(pose.png).ensureAlpha().raw().toBuffer({resolveWithObject:true});

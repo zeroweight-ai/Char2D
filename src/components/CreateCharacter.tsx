@@ -1,19 +1,12 @@
 "use client";
-import { viewLabels, type ViewType } from "@/lib/manifest";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { PixelIcon, type PixelIconName } from "./PixelIcon";
-const views:Record<ViewType,{icon:PixelIconName;text:string}>={
-  side_scroller:{icon:"side",text:"For platformers. Gets idle, walk, jump and crouch."},
-  top_down:{icon:"top",text:"Seen from above, like classic RPGs. Gets idle and walk in 4 directions."},
-  three_quarter:{icon:"quarter",text:"Angled from above, showing front and side. Gets idle and walk."},
-};
+import { PixelIcon } from "./PixelIcon";
 const ACCEPTED=["image/png","image/jpeg","image/webp"];
 export function CreateCharacter() {
   const router=useRouter();
-  const [viewType,setViewType]=useState<ViewType>("side_scroller");
   const [mode,setMode]=useState<"upload"|"prompt">("upload");
   const [file,setFile]=useState<File|null>(null);
   const [preview,setPreview]=useState("");
@@ -38,7 +31,7 @@ export function CreateCharacter() {
     event.preventDefault();setError("");
     if(missing.length){setError(`Add ${missing.join(" and ")} first.`);return;}
     const form=new FormData(event.currentTarget);form.set("mode",mode);form.delete("creation-mode");form.delete("image-picker");
-    if(mode==="upload"&&file)form.set("image",file);
+    if(mode==="upload"&&file){form.set("image",file);form.set("description","");}
     setBusy(true);
     try {
       const response=await fetch("/api/characters",{method:"POST",body:form});
@@ -62,8 +55,6 @@ export function CreateCharacter() {
             {preview ? <><Image src={preview} alt="Source image preview" width={240} height={200} unoptimized className="upload-preview" /><span className="dropzone-text"><strong>{file?.name}</strong><small>Click or drop to replace</small></span></>
               :<><PixelIcon name="upload" className="dropzone-icon"/><span className="dropzone-text"><strong>Drop an image here, or click to choose</strong><small>PNG, JPEG or WebP, up to 10 MB</small></span></>}
           </label>
-          <label className="field-label" htmlFor="character-description">Appearance notes (optional)</label>
-          <textarea id="character-description" name="description" maxLength={2000} rows={2} value={description} onChange={event=>setDescription(event.target.value)} placeholder="Anything to keep or change, e.g. “keep the red scarf, give it boots”" />
         </>:<>
           <label className="field-label" htmlFor="character-description">Describe your character</label>
           <textarea id="character-description" name="description" maxLength={2000} rows={4} value={description} onChange={event=>setDescription(event.target.value)} placeholder="A knight in a forest-green tunic and cape, steel armor, brown boots, carrying a sword" />
@@ -73,12 +64,6 @@ export function CreateCharacter() {
         <div className="step-head"><span className="step-no">2</span><h2 id="step-name">Give it a name</h2></div>
         <label className="sr-only" htmlFor="character-name">Character name</label>
         <input id="character-name" name="name" maxLength={80} placeholder="e.g. Rowan the Green Knight" value={name} onChange={event=>setName(event.target.value)} />
-      </section>
-      <section className="form-step" aria-labelledby="step-view">
-        <div className="step-head"><span className="step-no">3</span><div><h2 id="step-view">Pick a game view</h2><p>Not sure? Keep side view.</p></div></div>
-        <fieldset className="creation-options three"><legend className="sr-only">Choose your character view</legend>
-          {(Object.keys(viewLabels) as ViewType[]).map(view=><label key={view} className={`option-card ${viewType===view?"selected":""}`}><input type="radio" name="viewType" value={view} checked={viewType===view} onChange={()=>setViewType(view)}/><PixelIcon name={views[view].icon} className="option-icon"/><span><strong>{viewLabels[view]}</strong><small>{views[view].text}</small></span></label>)}
-        </fieldset>
       </section>
       <div className="submit-row">
         <button type="submit" className="big">{busy ? "Starting…":"Generate character sheet"}</button>

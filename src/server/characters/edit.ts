@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase } from "../db";
 import { actions, actionVersions, characters, jobs } from "../db/schema";
@@ -20,7 +20,7 @@ export type ActionPatch = z.infer<typeof actionPatchSchema>;
 
 function assertIdle(characterId: string) {
   const { db } = getDatabase();
-  if (db.select().from(jobs).where(and(eq(jobs.characterId, characterId), inArray(jobs.status, ["queued", "running"]))).get())
+  if (db.select().from(jobs).where(and(eq(jobs.characterId, characterId), ne(jobs.type, "sound"), inArray(jobs.status, ["queued", "running"]))).get())
     throw new EditError("Animations are still generating. Wait for them to finish first.");
 }
 function load(characterId: string, key: string) {

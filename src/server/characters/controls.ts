@@ -34,9 +34,9 @@ export function ensureBindings(characterId: string) {
     if (!character) return;
     const list = db.select().from(actions).where(and(eq(actions.characterId, characterId), eq(actions.bindingsSeeded, false))).orderBy(actions.sortOrder, actions.createdAt).all();
     const taken = new Set(db.select({ code: inputBindings.code }).from(inputBindings).where(eq(inputBindings.characterId, characterId)).all().map(row => row.code));
-    for (const profile of PROFILES) for (const code of Object.keys(movementKeys(character.viewType, profile))) taken.add(code);
+    for (const profile of PROFILES) for (const code of Object.keys(movementKeys(profile))) taken.add(code);
     for (const action of list) {
-      for (const profile of PROFILES) for (const code of defaultCodes(character.viewType, profile, action.key, taken)) {
+      for (const profile of PROFILES) for (const code of defaultCodes(profile, action.key, taken)) {
         taken.add(code);
         db.insert(inputBindings).values({ id: nanoid(), characterId, profile, actionId: action.id, device: "keyboard", code, trigger: triggerFor(action.gameplayJson) }).run();
       }
@@ -65,7 +65,7 @@ export function replaceBindings(characterId: string, profile: Profile, next: Rec
       if (new Set(codes).size !== codes.length) throw new ControlsError(`${byKey.get(key)!.label} lists the same key twice`, 400);
     }
     const merged: Bindings = { ...readBindings(characterId), [profile]: next };
-    const conflicts = findConflicts(character.viewType, merged, Object.fromEntries(list.map(action => [action.key, action.label])));
+    const conflicts = findConflicts(merged, Object.fromEntries(list.map(action => [action.key, action.label])));
     if (conflicts.length) throw new ControlsError(conflicts[0].message);
     db.delete(inputBindings).where(and(eq(inputBindings.characterId, characterId), eq(inputBindings.profile, profile), eq(inputBindings.device, "keyboard"))).run();
     for (const [key, codes] of Object.entries(next)) {

@@ -1,0 +1,92 @@
+import { afterEach,beforeEach,expect,it,vi } from "vitest";
+import { mkdtempSync,rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { readFile } from "node:fs/promises";
+import sharp from "sharp";
+import { eq } from "drizzle-orm";
+const state=vi.hoisted(()=>({config:{dataDir:"",fakeAI:true,elevenLabsKey:""}}));
+vi.mock("../src/server/config",()=>({config:state.config}));
+vi.mock("../src/server/ai",async()=>{const {FakeProvider}=await import("../src/server/ai/fake");return {provider:new FakeProvider()};});
+import { getDatabase,openDatabase } from "../src/server/db";
+import { actions,characters,characterSheets,jobs } from "../src/server/db/schema";
+import { existsSync } from "node:fs";
+import { planCustomAction,createCustomAction } from "../src/server/characters/custom-action";
+import { saveAsset,readAsset } from "../src/server/storage/assets";
+import { acceptAndAnimate,regenerateAction } from "../src/server/characters/animations";
+import { requestSound,removeSound } from "../src/server/characters/sound";
+import { runSoundJob } from "../src/server/characters/sound";
+import { JobQueue } from "../src/server/jobs/queue";
+import { runAnimationJob } from "../src/server/pipeline/animations";
+import { manifestSchema } from "../src/lib/manifest";
+import { parseSoundState } from "../src/lib/sound";
+import { removeChroma } from "../src/server/pixel/chroma";
+import { planSound } from "../src/server/ai/sound";
+const globalDb=globalThis as typeof globalThis & {char2dDb?:ReturnType<typeof openDatabase>};
+let previous:ReturnType<typeof openDatabase>|undefined;
+beforeEach(async()=>{
+  state.config.dataDir=mkdtempSync(join(tmpdir(),"char2d-sound-"));previous=globalDb.char2dDb;globalDb.char2dDb=openDatabase(state.config.dataDir);
+  const fixture=await readFile("tests/fixtures/demo-sheet.png");
+  const decoded=await sharp(fixture).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+  const keyed=removeChroma(decoded.data,decoded.info.width,decoded.info.height,"#FF00FF");
+  const png=await sharp(keyed.rgba,{raw:{width:decoded.info.width,height:decoded.info.height,channels:4}}).png().toBuffer();
+  const {db}=getDatabase();
+  db.insert(characters).values({id:"char",name:"Knight",description:"green knight",viewType:"side_scroller",sheetId:"sheet",styleJson:JSON.stringify({chromaKey:"#FF00FF",logicalHeight:48}),createdAt:1,updatedAt:1}).run();
+  const asset=await saveAsset(png,{characterId:"char",kind:"sheet_transparent",mime:"image/png"});
+  db.insert(characterSheets).values({id:"sheet",characterId:"char",version:1,status:"ready",processedAssetId:asset.id,prompt:"accepted pixel character",createdAt:1}).run();
+});
+afterEach(()=>{globalDb.char2dDb?.sqlite.close();globalDb.char2dDb=previous;rmSync(state.config.dataDir,{recursive:true,force:true});});
+async function drain(){const queue=new JobQueue();let count=0;for(let job=queue.claim("test");job;job=queue.claim("test")){if(job.type==="sound")await runSoundJob(job,queue);else await runAnimationJob(job,queue);queue.complete(job.id);if(++count>60)throw new Error("Job loop did not terminate");}}
+const manifest=()=>manifestSchema.parse(JSON.parse(getDatabase().db.select().from(characters).where(eq(characters.id,"char")).get()!.manifestJson!));
+const sound=(key:string)=>parseSoundState(getDatabase().db.select().from(actions).where(eq(actions.key,key)).get()!.soundJson);
+it("gives default moves the bundled sounds with no API call: idle silent, walk footsteps on foot contacts",async()=>{
+  const generate=vi.spyOn(await import("../src/server/ai/sound"),"generateSoundEffect");
+  acceptAndAnimate("char","sheet");await drain();
+  expect(generate).not.toHaveBeenCalled();
+  expect(getDatabase().db.select().from(jobs).where(eq(jobs.type,"sound")).all()).toHaveLength(0);
+  expect(sound("idle")).toMatchObject({status:"none",requestedBy:"default"});
+  expect(sound("walk")).toMatchObject({status:"ready",builtin:"/sounds/walk.mp3",frames:[0,2],requestedBy:"default"});
+  const published=manifest();
+  expect(published.actions.idle.sound).toBeUndefined();
+  expect(published.actions.walk.sound).toEqual({url:"/sounds/walk.mp3",frames:[0,2],volume:0.9});
+  expect(published.actions.jump.sound).toMatchObject({url:"/sounds/jump.mp3",frames:[1]});
+  expect(published.actions.crouch.sound?.url).toBe("/sounds/crouch.mp3");
+  for(const name of ["walk","jump","crouch"])expect(existsSync(`public/sounds/${name}.mp3`)).toBe(true);
+});
+it("replaces a built-in sound with a generated one when the player asks",async()=>{
+  acceptAndAnimate("char","sheet");await drain();
+  requestSound("char","walk");await drain();
+  expect(sound("walk")).toMatchObject({status:"ready",requestedBy:"user"});expect(sound("walk").builtin).toBeUndefined();
+  const url=manifest().actions.walk.sound!.url;expect(url).toMatch(/^\/api\/assets\//);
+  expect((await readAsset(url.split("/").pop()!))?.asset.mime).toBe("audio/wav");
+});
+it("still lets the AI decide (and generate) sounds for new custom moves",async()=>{
+  acceptAndAnimate("char","sheet");await drain();
+  const preview=await planCustomAction("char","spin with a sword");
+  const {key}=createCustomAction("char",preview.sheetId,preview.action);await drain();
+  expect(sound(key)).toMatchObject({status:"ready",requestedBy:"ai"});
+  expect(manifest().actions[key].sound?.url).toMatch(/^\/api\/assets\//);
+});
+it("generates a sound on request even when the AI chose none, and can remove it",async()=>{
+  acceptAndAnimate("char","sheet");await drain();
+  expect(requestSound("char","idle").soundCalls).toBe(1);
+  expect(()=>requestSound("char","idle")).toThrow(/already/);
+  expect(sound("idle").status).toBe("queued");
+  await drain();
+  expect(sound("idle")).toMatchObject({status:"ready",requestedBy:"user"});
+  expect(manifest().actions.idle.sound).toBeDefined();
+  removeSound("char","idle");
+  expect(manifest().actions.idle.sound).toBeUndefined();expect(sound("idle").status).toBe("none");
+});
+it("does not let a pending sound block animation work, and keeps sounds across regeneration",async()=>{
+  acceptAndAnimate("char","sheet");await drain();
+  requestSound("char","walk");
+  expect(()=>regenerateAction("char","jump")).not.toThrow();
+  await drain();
+  expect(manifest().actions.walk.sound).toBeDefined();expect(manifest().actions.jump.sound).toBeDefined();
+});
+it("forces needed=true and clamps trigger frames to the action",async()=>{
+  const chat=vi.fn().mockResolvedValue({text:'{"needed":false,"reason":"quiet","prompt":"soft cloth rustle","frames":[3,9,3],"durationSeconds":0.5}'});
+  const decision=await planSound({chat},{force:true,character:{name:"a",description:"b"},action:{key:"idle",label:"Idle",summary:"s",poses:["a","b","c","d"],durationsMs:[1,1,1,1],playback:"loop"}});
+  expect(decision).toMatchObject({needed:true,frames:[3]});
+});

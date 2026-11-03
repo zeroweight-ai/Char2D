@@ -12,6 +12,15 @@ export class FakeProvider implements ChatModel, ImageModel {
       let key="custom_action";let suffix=2;while(input.existing.some(action=>action.key===key))key=`custom_action_${suffix++}`;
       return {text:JSON.stringify({key,label:"Custom action",plan:{summary:input.prompt,frames:4,poses:["Anticipate: "+input.prompt,"Begin: "+input.prompt,"Perform: "+input.prompt,"Recover to neutral"],durationsMs:[100,100,150,100],playback:"once",canvas:"standard"},gameplay:{trigger:"press",lockMovement:false,interruptible:true}})};
     }
+    if(request?.system.includes("Char2D walk-cycle checker"))
+      return {text:JSON.stringify({legA:"near leg, drawn on top",legB:"far leg, slightly darker",distinguishable:true,frames:[{frame:1,front:"A"},{frame:2,lifted:"B"},{frame:3,front:"B"},{frame:4,lifted:"A"}]})};
+    if(request?.system.includes("Char2D sound designer")) {
+      const input=JSON.parse(request.messages[0].content) as {force:boolean;action:{key:string;label:string;poses:string[]}};
+      const quiet=/^(idle|crouch)/.test(input.action.key);
+      if(quiet&&!input.force)return {text:JSON.stringify({needed:false,reason:`${input.action.label} is a quiet motion; it plays without sound.`})};
+      const walk=input.action.key==="walk";
+      return {text:JSON.stringify({needed:true,reason:walk?"Footsteps on each foot contact.":`A short effect as ${input.action.label} happens.`,prompt:walk?"single soft footstep on grass":`short whoosh for ${input.action.label}`,frames:walk?[0,2]:[input.action.key==="jump"?1:0],durationSeconds:0.5})};
+    }
     if(request?.system.includes("Char2D revision planner")) {
       const input=JSON.parse(request.messages[0].content) as {note:string};
       const fresh=/start (?:over|again)|from scratch|fresh (?:sheet|variation|start)|new sheet|replace (?:the )?(?:whole|entire) character/i.test(input.note);

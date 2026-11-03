@@ -42,7 +42,7 @@ export class MuseProvider implements ChatModel, ImageModel {
     }
   }
   async chat(request:ChatRequest) {
-    const raw = await this.request("/responses",{ model:config.chatModel,store:false,instructions:request.system,input:request.messages.map(message => ({ role:message.role,content:[{type:message.role==="assistant" ? "output_text":"input_text",text:message.content}] })) },"chat",request.signal);
+    const raw = await this.request("/responses",{ model:config.chatModel,store:false,instructions:request.system,input:request.messages.map(message => ({ role:message.role,content:[{type:message.role==="assistant" ? "output_text":"input_text",text:message.content},...(message.images ?? []).flatMap(image => [{type:"input_text",text:image.label},{type:"input_image",image_url:`data:image/png;base64,${image.png.toString("base64")}`}])] })) },"chat",request.signal);
     const parsed = chatResponse.parse(raw);
     return { text:parsed.output.filter(item => item.type==="message").flatMap(item => item.content ?? []).filter(block => block.type==="output_text").map(block => block.text ?? "").join(""), usage:parsed.usage };
   }

@@ -61,7 +61,7 @@ export function ControlsPanel({characterId,manifest,bindings}:{characterId:strin
     if(event.code==="Backspace"){clear();return;}
     if(RESERVED_CODES.has(event.code)||!/^[A-Za-z0-9]{1,32}$/.test(event.code)){setError("That key can’t be bound.");return;}
     if(event.code===capture.replacing){close();return;}
-    const owner=codeOwner(manifest.viewType,bindings,event.code);
+    const owner=codeOwner(bindings,event.code);
     if(!owner){assign(event.code);return;}
     if(!owner.action){setError(`${keyLabel(event.code)} is a ${profileLabels[owner.profile]} movement key and can’t be reassigned.`);return;}
     if(owner.action===capture.action&&owner.profile===capture.profile){setError(`${keyLabel(event.code)} is already bound to ${label(capture.action)}.`);return;}
@@ -72,7 +72,7 @@ export function ControlsPanel({characterId,manifest,bindings}:{characterId:strin
     <p className="muted">Click a key to change it, or <strong>+</strong> to add one. Player 2 is for two-player games. Walking keys are fixed.</p>
     <div className="controls-table" role="table" aria-label="Key bindings">
       <div className="controls-row head" role="row"><span role="columnheader">Move</span>{PROFILES.map(profile=><span role="columnheader" key={profile}>{profileLabels[profile]}</span>)}</div>
-      <div className="controls-row" role="row"><span role="rowheader">Walk</span>{PROFILES.map(profile=><span role="cell" key={profile} data-label={profileLabels[profile]} className="key-list">{Object.entries(movementKeys(manifest.viewType,profile)).map(([code,dir])=><span key={code} className="key locked" title={`Move ${dir} (fixed)`}>{keyLabel(code)}</span>)}</span>)}</div>
+      <div className="controls-row" role="row"><span role="rowheader">Walk</span>{PROFILES.map(profile=><span role="cell" key={profile} data-label={profileLabels[profile]} className="key-list">{Object.entries(movementKeys(profile)).map(([code,dir])=><span key={code} className="key locked" title={`Move ${dir} (fixed)`}>{keyLabel(code)}</span>)}</span>)}</div>
       {actionKeys.map(key=><div className="controls-row" role="row" key={key}><span role="rowheader">{label(key)}</span>{PROFILES.map(profile=>{
         const codes=bindings[profile][key]??[];
         if(!isBindable(key))return <span role="cell" key={profile} data-label={profileLabels[profile]} className="muted fine-print">Follows move keys</span>;

@@ -40,7 +40,7 @@ export async function generateSheet(job:Job,queue:JobQueue) {
           samples=sampleColors(await sharp(latest.bytes).resize(128,128,{fit:"inside"}).ensureAlpha().raw().toBuffer());
         }
         const key=chooseChromaKey(samples,`${character.description} ${payload.revision.note}`);
-        prompt=revisionSheetPrompt(character.description,character.viewType,key,payload.revision.note,decision.path,!!referenceAssetId,style.logicalHeight);
+        prompt=revisionSheetPrompt(character.description,key,payload.revision.note,decision.path,!!referenceAssetId,style.logicalHeight);
         payload.generation={...decision,referenceAssetId,chromaKey:key};
         // Persist the decision, reference and prompt before image generation. A
         // restarted worker must not switch reference images or choose a new path.

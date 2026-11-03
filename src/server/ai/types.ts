@@ -1,4 +1,5 @@
-export type ChatMessage = { role: "user" | "assistant"; content: string };
+// images: labelled PNGs shown to the model after `content` (user messages only).
+export type ChatMessage = { role: "user" | "assistant"; content: string; images?: { label: string; png: Buffer }[] };
 export type ChatRequest = { system: string; messages: ChatMessage[]; signal?: AbortSignal };
 export type ChatResult = { text: string; usage?: unknown };
 export interface ChatModel { chat(request: ChatRequest): Promise<ChatResult> }

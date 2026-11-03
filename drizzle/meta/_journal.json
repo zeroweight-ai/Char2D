@@ -15,6 +15,13 @@
       "when": 1793550681765,
       "tag": "0001_action_bindings_seeded",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793699459677,
+      "tag": "0002_real_toad",
+      "breakpoints": true
     }
   ]
 }

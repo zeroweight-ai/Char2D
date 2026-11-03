@@ -9,6 +9,7 @@ import { runAnimationJob } from "../server/pipeline/animations";
 import { characters,actionVersions } from "../server/db/schema";
 import { eq } from "drizzle-orm";
 import { generateSheet } from "../server/pipeline/sheet";
+import { runSoundJob } from "../server/characters/sound";
 const queue = new JobQueue();
 const workerId = `worker-${process.pid}-${nanoid(6)}`;
 let stopping = false;
@@ -19,6 +20,7 @@ async function run(job:Job) {
   try {
     if (job.type==="sheet") { await generateSheet(job,queue); queue.complete(job.id); return; }
     if (["strip","process_action","compose_atlas"].includes(job.type)) {await runAnimationJob(job,queue);queue.complete(job.id);return;}
+    if (job.type==="sound") {await runSoundJob(job,queue);queue.complete(job.id);return;}
     if (job.type!=="demo") throw new Error(`Handler for ${job.type} is not implemented yet.`);
     queue.event(job.id,"progress",{progress:20,message:"Preparing fixture"});
     await sleep(400);

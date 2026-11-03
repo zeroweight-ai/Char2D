@@ -1,5 +1,5 @@
 import "server-only";
-import { and,desc,eq,inArray,sql } from "drizzle-orm";
+import { and,desc,eq,inArray,ne,sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDatabase } from "../db";
 import { actions,actionVersions,characters,characterSheets,jobs } from "../db/schema";
@@ -20,14 +20,14 @@ export function acceptAndAnimate(characterId:string,sheetId:string) {
     if(character.sheetId!==sheetId||!sheet?.processedAssetId||!["ready","accepted"].includes(sheet.status))throw new AnimationError("This sheet is not ready or has been replaced. Refresh and review the latest sheet.");
     const existing=db.select().from(jobs).where(and(eq(jobs.characterId,characterId),eq(jobs.type,"compose_atlas"),sql`json_extract(${jobs.payloadJson}, '$.sheetId') = ${sheetId}`)).get();
     if(existing)return {jobId:existing.id,alreadyQueued:true};
-    const busy=db.select().from(jobs).where(and(eq(jobs.characterId,characterId),inArray(jobs.status,["queued","running"]))).get();
+    const busy=db.select().from(jobs).where(and(eq(jobs.characterId,characterId),ne(jobs.type,"sound"),inArray(jobs.status,["queued","running"]))).get();
     if(busy)throw new AnimationError("Character generation is still in progress.");
     const style=styleSchema.parse(JSON.parse(character.styleJson));
     const queue=new JobQueue();
     const prepare=queue.enqueue("process_action",{sheetId,stage:"prepare"},{characterId,maxAttempts:1});
     const done:string[]=[],versionIds:string[]=[];
     let idleVersionId:string|undefined,idleFinished:string|undefined;
-    const defaults=defaultPresets(character.viewType,style.mirrorLeft);
+    const defaults=defaultPresets(style.mirrorLeft);
     defaults.forEach((preset,order)=>{
       let action=db.select().from(actions).where(and(eq(actions.characterId,characterId),eq(actions.key,preset.key))).get();
       if(!action){const id=nanoid();db.insert(actions).values({id,characterId,key:preset.key,label:preset.label,isDefault:true,directionsJson:JSON.stringify(preset.directions),gameplayJson:JSON.stringify(preset.gameplay),sortOrder:order,createdAt:Date.now(),updatedAt:Date.now()}).run();action=db.select().from(actions).where(eq(actions.id,id)).get()!;}
@@ -74,13 +74,13 @@ export function regenerateAction(characterId:string,key:string,mode:"generate"|"
     if(!action)throw new AnimationError("Action not found",404);
     const sheet=character.sheetId?db.select().from(characterSheets).where(and(eq(characterSheets.id,character.sheetId),eq(characterSheets.characterId,characterId))).get():null;
     if(sheet?.status!=="accepted"||!sheet.processedAssetId)throw new AnimationError("Accept the current sheet before regenerating actions.");
-    if(db.select().from(jobs).where(and(eq(jobs.characterId,characterId),inArray(jobs.status,["queued","running"]))).get())throw new AnimationError("Generation is already in progress. Wait for it to finish.");
+    if(db.select().from(jobs).where(and(eq(jobs.characterId,characterId),ne(jobs.type,"sound"),inArray(jobs.status,["queued","running"]))).get())throw new AnimationError("Generation is already in progress. Wait for it to finish.");
     const latest=db.select().from(actionVersions).where(eq(actionVersions.actionId,action.id)).orderBy(desc(actionVersions.version)).get();
     const active=action.activeVersionId?db.select().from(actionVersions).where(and(eq(actionVersions.id,action.activeVersionId),eq(actionVersions.actionId,action.id),eq(actionVersions.status,"ready"))).get():null;
     const previous=active??latest;
     if(!previous)throw new AnimationError("This action has no generation plan.");
     const savedPlan=JSON.parse(previous.planJson);
-    const plan=mode==="reprocess"?storedActionPlanSchema.parse(savedPlan):key==="walk"?defaultPresets(character.viewType).find(preset=>preset.key==="walk")!.plan:limitActionPlan(savedPlan);
+    const plan=mode==="reprocess"?storedActionPlanSchema.parse(savedPlan):key==="walk"?defaultPresets().find(preset=>preset.key==="walk")!.plan:limitActionPlan(savedPlan);
     const directions=z.array(directionSchema).min(1).parse(JSON.parse(action.directionsJson));
     if(mode==="reprocess") {
       const saved=stripsSchema.parse(JSON.parse(previous.stripsJson));

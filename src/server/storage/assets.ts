@@ -14,9 +14,9 @@ export function assetPath(relativePath: string) {
   if (!path.startsWith(root()+sep)) throw new Error("Invalid asset path");
   return path;
 }
-export async function saveAsset(bytes: Buffer, options: { kind: string; mime: "image/png" | "image/webp" | "image/jpeg" | "application/json"; characterId?: string; width?: number; height?: number }) {
+export async function saveAsset(bytes: Buffer, options: { kind: string; mime: "image/png" | "image/webp" | "image/jpeg" | "application/json" | "audio/mpeg" | "audio/wav"; characterId?: string; width?: number; height?: number }) {
   const hash = createHash("sha256").update(bytes).digest("hex");
-  const ext = { "image/png": "png", "image/webp": "webp", "image/jpeg": "jpg", "application/json": "json" }[options.mime];
+  const ext = { "image/png": "png", "image/webp": "webp", "image/jpeg": "jpg", "application/json": "json", "audio/mpeg": "mp3", "audio/wav": "wav" }[options.mime];
   const path = `${hash.slice(0,2)}/${hash}.${ext}`;
   const absolute = assetPath(path);
   const asset = { id:nanoid(), characterId:options.characterId, kind:options.kind, path, mime:options.mime, width:options.width, height:options.height, bytes:bytes.length, sha256:hash, createdAt:Date.now() };

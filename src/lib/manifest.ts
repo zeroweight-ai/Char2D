@@ -1,8 +1,9 @@
 import { z } from "zod";
+import { manifestSoundSchema } from "./sound";
 export const directionSchema = z.enum(["right","left","up","down"]);
-export const viewTypeSchema = z.enum(["side_scroller","top_down","three_quarter"]);
-export type ViewType = z.infer<typeof viewTypeSchema>;
-export const viewLabels:Record<ViewType,string>={side_scroller:"Side view",top_down:"Top-down view",three_quarter:"Three-quarter view"};
+// Char2D makes side-view (side-scroller) characters only. The manifest keeps
+// the field so the exported format stays stable for game engines.
+export const viewTypeSchema = z.literal("side_scroller");
 export const gameplaySchema = z.object({
   trigger:z.enum(["press","hold","toggle"]),lockMovement:z.boolean(),interruptible:z.boolean(),
   cooldownMs:z.number().nonnegative().optional(), rootMotion:z.object({dx:z.number(),dy:z.number(),overMs:z.number().positive()}).optional(),
@@ -35,7 +36,7 @@ const directionFramesSchema = z.union([
 export const manifestSchema = z.object({
   version:z.literal(1),characterId:z.string().min(1),viewType:viewTypeSchema,
   atlas:z.object({url:z.string().min(1),width:z.number().int().positive(),height:z.number().int().positive(),version:z.number().int().nonnegative()}),pixelScale:z.number().int().positive(),
-  actions:z.record(z.string(),z.object({label:z.string(),playback:z.enum(["loop","once","once_hold"]),directions:z.partialRecord(directionSchema,directionFramesSchema),gameplay:gameplaySchema,events:z.array(z.object({frame:z.number().int().nonnegative(),name:z.string()})).optional()})),
+  actions:z.record(z.string(),z.object({label:z.string(),playback:z.enum(["loop","once","once_hold"]),directions:z.partialRecord(directionSchema,directionFramesSchema),gameplay:gameplaySchema,events:z.array(z.object({frame:z.number().int().nonnegative(),name:z.string()})).optional(),sound:manifestSoundSchema.optional()})),
 }).superRefine((manifest,ctx) => {
   for(const action of Object.values(manifest.actions)) {
     for(const [direction,value] of Object.entries(action.directions)) {

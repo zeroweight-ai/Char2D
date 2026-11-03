@@ -1,6 +1,6 @@
 import { expect,test } from "@playwright/test";
 test("adds a prompted custom action after accepting the sheet",async({page,request})=>{
-  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name:`Custom action ${Date.now()}`,description:"green knight",viewType:"side_scroller"}});
+  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name:`Custom action ${Date.now()}`,description:"green knight"}});
   expect(response.status()).toBe(202);const {id}=await response.json();
   await page.goto(`/characters/${id}`);
   await expect(page.getByRole("button",{name:"Looks good — accept sheet"})).toBeVisible({timeout:30_000});

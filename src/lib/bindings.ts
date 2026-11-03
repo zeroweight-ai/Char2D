@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Direction, ViewType } from "./manifest";
+import type { Direction } from "./manifest";
 
 // Key bindings (PLAN §6.5). Codes are KeyboardEvent.code values, so they are
 // layout-independent. Movement keys are fixed per profile and drive Walk; every
@@ -20,17 +20,15 @@ const CUSTOM_POOL: Record<Profile, string[]> = {
   p2: ["Numpad1", "Numpad2", "Numpad3", "Numpad4", "Numpad5", "Numpad6"],
 };
 
-export function movementKeys(view: ViewType, profile: Profile): Record<string, Direction> {
-  if (view === "side_scroller") return profile === "p1" ? { KeyA: "left", KeyD: "right" } : { ArrowLeft: "left", ArrowRight: "right" };
-  return profile === "p1" ? { KeyW: "up", KeyA: "left", KeyS: "down", KeyD: "right" } : { ArrowUp: "up", ArrowLeft: "left", ArrowDown: "down", ArrowRight: "right" };
+export function movementKeys(profile: Profile): Record<string, Direction> {
+  return profile === "p1" ? { KeyA: "left", KeyD: "right" } : { ArrowLeft: "left", ArrowRight: "right" };
 }
 export function isBindable(actionKey: string) { return !LOCOMOTION_ACTIONS.has(actionKey); }
 
 /** Default codes for a newly seen action, skipping codes already taken. */
-export function defaultCodes(view: ViewType, profile: Profile, actionKey: string, taken: Set<string>): string[] {
+export function defaultCodes(profile: Profile, actionKey: string, taken: Set<string>): string[] {
   if (!isBindable(actionKey)) return [];
-  const side = view === "side_scroller";
-  const preset: Record<string, Record<Profile, string[]>> = side ? { jump: { p1: ["KeyW", "Space"], p2: ["ArrowUp"] }, crouch: { p1: ["KeyS"], p2: ["ArrowDown"] } } : {};
+  const preset: Record<string, Record<Profile, string[]>> = { jump: { p1: ["KeyW", "Space"], p2: ["ArrowUp"] }, crouch: { p1: ["KeyS"], p2: ["ArrowDown"] } };
   const wanted = preset[actionKey]?.[profile];
   if (wanted) return wanted.filter(code => !taken.has(code));
   const free = CUSTOM_POOL[profile].find(code => !taken.has(code));
@@ -61,9 +59,9 @@ export type Conflict = { code: string; message: string };
  * Validates a full binding set. One key does exactly one thing across both
  * profiles, so two players can share a keyboard in the Playground.
  */
-export function findConflicts(view: ViewType, bindings: Bindings, labels: Record<string, string>): Conflict[] {
+export function findConflicts(bindings: Bindings, labels: Record<string, string>): Conflict[] {
   const owner = new Map<string, string>(), conflicts: Conflict[] = [];
-  for (const profile of PROFILES) for (const [code, direction] of Object.entries(movementKeys(view, profile))) owner.set(code, `${profileLabels[profile]} move ${direction}`);
+  for (const profile of PROFILES) for (const [code, direction] of Object.entries(movementKeys(profile))) owner.set(code, `${profileLabels[profile]} move ${direction}`);
   for (const profile of PROFILES) for (const [action, codes] of Object.entries(bindings[profile] ?? {})) for (const code of codes) {
     const name = `${labels[action] ?? action} (${profileLabels[profile]})`;
     const existing = owner.get(code);
@@ -73,9 +71,9 @@ export function findConflicts(view: ViewType, bindings: Bindings, labels: Record
   return conflicts;
 }
 /** The action/profile already holding a code, if any (for "swap?" prompts). */
-export function codeOwner(view: ViewType, bindings: Bindings, code: string): { profile: Profile; action: string | null } | null {
+export function codeOwner(bindings: Bindings, code: string): { profile: Profile; action: string | null } | null {
   for (const profile of PROFILES) {
-    if (movementKeys(view, profile)[code]) return { profile, action: null };
+    if (movementKeys(profile)[code]) return { profile, action: null };
     for (const [action, codes] of Object.entries(bindings[profile] ?? {})) if (codes.includes(code)) return { profile, action };
   }
   return null;

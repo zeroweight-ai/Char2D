@@ -1,5 +1,4 @@
 "use client";
-import { viewLabels } from "@/lib/manifest";
 import Image from "next/image";
 import Link from "next/link";
 import { useQuery,useQueryClient } from "@tanstack/react-query";
@@ -25,7 +24,7 @@ export function CharacterGallery() {
       return <article className="panel character-card" key={character.id}><Link href={`/characters/${character.id}`} className="card-link">
         <div className="checker">{character.sheet?.processedAssetId?<Image src={`/api/assets/${character.sheet.processedAssetId}`} alt={`${character.name} sheet preview`} width={300} height={200} unoptimized className="pixel-preview"/>:<span className="muted">…</span>}</div>
         <h3>{character.name}</h3>
-        <div className="stats"><span className={`pill ${status.tone}`}>{status.label}</span><span className="muted">{viewLabels[character.viewType]}{moves>0?` · ${moves} move${moves===1?"":"s"}`:""}</span></div>
+        <div className="stats"><span className={`pill ${status.tone}`}>{status.label}</span>{moves>0&&<span className="muted">{moves} move{moves===1?"":"s"}</span>}</div>
       </Link><DeleteButton quiet text="Delete" label="Delete character" title={`Delete ${character.name}?`} description="This permanently deletes the character, its sheets, moves and saved images. This cannot be undone." endpoint={`/api/characters/${character.id}`} onDeleted={async()=>{client.removeQueries({queryKey:["character",character.id]});await client.invalidateQueries({queryKey:["characters"]});}}/></article>;
     })}<Link className="slot-empty" href="/create"><span className="plus" aria-hidden="true">+</span>New character</Link></div>}
   </section>;

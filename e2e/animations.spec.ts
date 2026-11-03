@@ -1,8 +1,8 @@
 import { expect,test } from "@playwright/test";
 import { manifestSchema } from "../src/lib/manifest";
 test.use({deviceScaleFactor:2});
-test("top-down acceptance generates three directions, mirrors left, and plays frames",async({page,request},testInfo)=>{
-  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name:`Top-down adventurer ${Date.now()}`,description:"A green-clothed knight",viewType:"top_down"}});
+test("side-view acceptance generates the four default moves, mirrors left, and plays frames",async({page,request},testInfo)=>{
+  const response=await request.post("/api/characters",{multipart:{mode:"prompt",name:`Side adventurer ${Date.now()}`,description:"A green-clothed knight"}});
   expect(response.status()).toBe(202);const {id}=await response.json();
   await page.goto(`/characters/${id}`);
   await expect(page.getByRole("heading",{name:"Your transparent character sheet"})).toBeVisible({timeout:30_000});
@@ -13,8 +13,8 @@ test("top-down acceptance generates three directions, mirrors left, and plays fr
   expect(duplicate.status()).toBe(202);expect((await duplicate.json()).alreadyQueued).toBe(true);
   const character=await (await request.get(`/api/characters/${id}`)).json();
   const manifest=manifestSchema.parse(character.manifest);expect(character.animation.total).toBe(10);
-  expect(Object.keys(manifest.actions)).toEqual(["idle","walk"]);
-  expect(Object.keys(manifest.actions.walk.directions).sort()).toEqual(["down","left","right","up"]);
+  expect(Object.keys(manifest.actions)).toEqual(["idle","walk","jump","crouch"]);
+  expect(manifest.actions.walk.directions.left).toEqual({mirrorOf:"right"});
   expect(Math.max(...manifest.actions.walk.directions.right!.frames!.map(frame=>frame.h))).toBe(43);
   await page.getByRole("button",{name:"Walk",exact:true}).click();
   const canvas=page.getByTestId("sprite-player");
@@ -25,9 +25,9 @@ test("top-down acceptance generates three directions, mirrors left, and plays fr
     let first=c.height,last=-1;for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++)if(pixels[(y*c.width+x)*4+3]){first=Math.min(first,y);last=Math.max(last,y);}
     return (last-first+1)/c.height;
   })).toBeGreaterThan(0.7);
-  await page.getByLabel("Animation direction",{exact:true}).selectOption("up");await expect(canvas).toHaveAttribute("data-direction","up");
+  await page.getByLabel("Animation direction",{exact:true}).selectOption("left");await expect(canvas).toHaveAttribute("data-direction","left");
   await page.getByRole("button",{name:"Pause",exact:true}).click();await page.getByLabel("Animation frame",{exact:true}).fill("3");await expect(canvas).toHaveAttribute("data-frame","3");
-  await page.getByRole("group",{name:"Animation stage, keyboard controls"}).focus();await page.keyboard.down("ArrowLeft");await expect(canvas).toHaveAttribute("data-direction","left");await page.keyboard.up("ArrowLeft");await expect(canvas).toHaveAttribute("data-action","idle");
+  await page.getByRole("group",{name:"Animation stage, keyboard controls"}).focus();await page.keyboard.down("ArrowRight");await expect(canvas).toHaveAttribute("data-direction","right");await page.keyboard.up("ArrowRight");await expect(canvas).toHaveAttribute("data-action","idle");
   await page.reload();await expect(page.getByRole("tab",{name:"Play",selected:true})).toBeVisible();
   await page.getByText("View ▾").click();
   await page.getByLabel("Preview zoom",{exact:true}).selectOption("native");

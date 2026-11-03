@@ -1,8 +1,7 @@
-import type { Direction, ViewType } from "@/lib/manifest";
+import type { Direction } from "@/lib/manifest";
 import { SHEET_RESOLUTION, DEFAULT_POSE_RESOLUTION } from "@/lib/resolution";
 export function sheetPrompt(
   description: string,
-  viewType: ViewType,
   key: string,
   hasReference: boolean,
   note = "",
@@ -10,12 +9,7 @@ export function sheetPrompt(
 ) {
   // Retain the legacy argument for callers; it no longer controls image detail.
   void _logicalHeight;
-  const views =
-    viewType === "side_scroller"
-      ? "right side profile facing right, front view, back view"
-      : viewType === "top_down"
-      ? "right-facing side view, down-facing front view, up-facing back view (behind), all from a steep top-down overhead camera"
-      : "right-facing three-quarter view, down-facing front three-quarter view, up-facing back three-quarter view (behind), all from a consistent 45-degree elevated camera";
+  const views = "right side profile facing right, front view, back view";
 
   return `Create a high-detail anime-inspired 16-bit/32-bit pixel-art character turnaround sheet for a 2D video game.
 
@@ -28,7 +22,7 @@ ${
 
 LAYOUT & POSES:
 - Target canvas: ${SHEET_RESOLUTION.width}×${SHEET_RESOLUTION.height} pixels, landscape 3:2. Three equal 640-pixel-wide pose slots.
-- Camera perspective: ${viewType === "side_scroller" ? "eye-level side view for a side-scrolling game" : viewType === "top_down" ? "steep overhead top-down view; show the tops of the head and shoulders" : "three-quarter view with a 45-degree elevated camera; show both front/side depth and the top surfaces"}. Keep this camera angle consistent across every pose.
+- Camera perspective: eye-level side view for a side-scrolling game. Keep this camera angle consistent across every pose.
 - Exactly three full-body neutral standing poses, left to right: ${views}.
 - Slot order: Right Side, Front, Behind. Never reorder these views.
 - One pose per equal-width invisible slot.
@@ -52,14 +46,13 @@ The layout, outline, and background rules above apply strictly.`;
 
 export function revisionSheetPrompt(
   description: string,
-  viewType: ViewType,
   key: string,
   note: string,
   path: "edit_latest" | "new_sheet",
   hasReference: boolean,
   logicalHeight = 128
 ) {
-  const base = sheetPrompt(description, viewType, key, hasReference, note, logicalHeight);
+  const base = sheetPrompt(description, key, hasReference, note, logicalHeight);
   if (path === "edit_latest")
     return `${base}
 REVISION MODE: Edit the attached latest generated sheet. It is the authoritative appearance reference and includes prior revisions. Preserve all existing pixel resolution, clean black outlines, details, colors, pose layout, identity, and proportions unless the user's newest note requests a change. Apply the newest revision note consistently in every view. Replace the old backdrop with the reserved background key ${key}, while retaining unaffected character colors.`;
@@ -69,8 +62,7 @@ REVISION MODE: Create a fresh high-detail pixel-art sheet from the original desc
     hasReference ? ", using the original upload as the starting reference" : ""
   }. Discard prior generated sheet designs. Where the newest note changes the original appearance, the note takes precedence. Keep the required view layout, clean dark pixel outlines, and solid background rules.`;
 }
-// Older overhead/elevated sheets used Front, Behind, Right Side.
-export function sheetAnchorOrder(prompt:string,viewType:ViewType):Direction[] {
-  return viewType==="side_scroller"||prompt.includes("Slot order: Right Side, Front, Behind.")
-    ? ["right","down","up"] : ["down","up","right"];
+/** Sheet slots, left to right: right side, front ("down"), back ("up"). */
+export function sheetAnchorOrder():Direction[] {
+  return ["right","down","up"];
 }
