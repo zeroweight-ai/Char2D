@@ -2,7 +2,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PixelIcon } from "./PixelIcon";
 import { MAX_CHARACTER_ZIP_BYTES } from "@/lib/character-archive";
 const ACCEPTED=["image/png","image/jpeg","image/webp"];
@@ -13,6 +13,7 @@ export function CreateCharacter() {
   const [archive,setArchive]=useState<File|null>(null);
   const [preview,setPreview]=useState("");
   const [dragging,setDragging]=useState(false);
+  const fileInput=useRef<HTMLInputElement>(null);
   const [name,setName]=useState(""),[description,setDescription]=useState("");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
@@ -54,22 +55,28 @@ export function CreateCharacter() {
   return <form className="panel create-form character-form" onSubmit={submit} noValidate>
     <fieldset disabled={busy}>
       <section className="form-step" aria-labelledby="step-source">
-        <div className="step-head"><span className="step-no">1</span><h2 id="step-source">Choose how to start</h2></div>
-        <fieldset className="creation-options three"><legend className="sr-only">How would you like to start?</legend>
-          <label className={`option-card row ${mode==="upload" ? "selected":""}`}><input type="radio" name="creation-mode" checked={mode==="upload"} onChange={()=>{setMode("upload");setError("");}} /><PixelIcon name="upload" className="option-icon"/><span><strong>Upload an image</strong><small>A photo, drawing or sprite</small></span></label>
-          <label className={`option-card row ${mode==="prompt" ? "selected":""}`}><input type="radio" name="creation-mode" checked={mode==="prompt"} onChange={()=>{setMode("prompt");setError("");}} /><PixelIcon name="quill" className="option-icon"/><span><strong>Describe a character</strong><small>Write what it looks like</small></span></label>
-          <label className={`option-card row ${mode==="zip" ? "selected":""}`}><input type="radio" name="creation-mode" checked={mode==="zip"} onChange={()=>{setMode("zip");setError("");}} /><PixelIcon name="upload" className="option-icon"/><span><strong>Upload a ZIP</strong><small>Restore exported frames</small></span></label>
+        <div className="step-head"><span className="step-no">1</span><h2 id="step-source">Start from a picture or an idea</h2></div>
+        {/* Mode = a two-way switch; the dropzone below is the only thing that takes a file. */}
+        <fieldset className="mode-switch"><legend className="sr-only">How would you like to start?</legend>
+          <label className={mode==="upload"?"on":""}><input type="radio" name="creation-mode" checked={mode==="upload"} onChange={()=>{setMode("upload");setError("");}} /><PixelIcon name="image" className="mode-icon"/>Upload an image</label>
+          <label className={mode==="prompt"?"on":""}><input type="radio" name="creation-mode" checked={mode==="prompt"} onChange={()=>{setMode("prompt");setError("");}} /><PixelIcon name="quill" className="mode-icon"/>Describe a character</label>
         </fieldset>
         {mode==="upload" ? <>
-          <label className={`dropzone${dragging?" dragging":""}${preview?" has-file":""}`} onDragOver={event=>{event.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={event=>{event.preventDefault();setDragging(false);pick(event.dataTransfer.files?.[0]);}}>
-            <input id="character-image" name="image-picker" aria-label="Character image" className="sr-only" type="file" accept={ACCEPTED.join(",")} onChange={event=>pick(event.target.files?.[0])} />
-            {preview ? <><Image src={preview} alt="Source image preview" width={240} height={200} unoptimized className="upload-preview" /><span className="dropzone-text"><strong>{file?.name}</strong><small>Click or drop to replace</small></span></>
-              :<><PixelIcon name="upload" className="dropzone-icon"/><span className="dropzone-text"><strong>Drop an image here, or click to choose</strong><small>PNG, JPEG or WebP, up to 10 MB</small></span></>}
-          </label>
-        </>:mode==="zip"?<label className={`dropzone${dragging?" dragging":""}${archive?" has-file":""}`} onDragOver={event=>{event.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={event=>{event.preventDefault();setDragging(false);pickArchive(event.dataTransfer.files?.[0]);}}>
-          <input name="archive-picker" aria-label="Character ZIP" className="sr-only" type="file" accept=".zip,application/zip,application/x-zip-compressed" onChange={event=>pickArchive(event.target.files?.[0])}/>
-          <PixelIcon name="upload" className="dropzone-icon"/><span className="dropzone-text"><strong>{archive?.name??"Drop a character ZIP here, or click to choose"}</strong><small>{archive?"Click or drop to replace":"ZIP exported from Char2D, up to 100 MB"}</small></span>
-        </label>:<>
+          <input ref={fileInput} id="character-image" name="image-picker" aria-label="Character image" className="sr-only" type="file" accept={ACCEPTED.join(",")} onChange={event=>{pick(event.target.files?.[0]);event.target.value="";}} />
+          {preview&&file ? <div className={`file-card${dragging?" dragging":""}`} onDragOver={event=>{event.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={event=>{event.preventDefault();setDragging(false);pick(event.dataTransfer.files?.[0]);}}>
+              <div className="file-thumb checker"><Image src={preview} alt="Source image preview" width={160} height={160} unoptimized className="upload-preview" /></div>
+              <div className="file-info"><strong>{file.name}</strong><small>{file.size<1024*1024?`${Math.max(1,Math.round(file.size/1024))} KB`:`${(file.size/1024/1024).toFixed(1)} MB`} · ready to use</small>
+                <div className="file-actions"><button type="button" className="secondary small" onClick={()=>fileInput.current?.click()}>Replace</button><button type="button" className="quiet-button" onClick={()=>{setFile(null);setError("");}}>Remove</button></div>
+              </div>
+            </div>
+            :<label htmlFor="character-image" className={`dropzone${dragging?" dragging":""}`} onDragOver={event=>{event.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={event=>{event.preventDefault();setDragging(false);pick(event.dataTransfer.files?.[0]);}}>
+              <PixelIcon name="upload" className="dropzone-icon"/>
+              <strong>{dragging?"Drop it!":"Drop your image here"}</strong>
+              <span className="dropzone-or">or</span>
+              <span className="button secondary small dropzone-button" aria-hidden="true">Choose a file</span>
+              <small>PNG, JPEG or WebP, up to 10 MB. A full-body character works best.</small>
+            </label>}
+        </>:<>
           <label className="field-label" htmlFor="character-description">Describe your character</label>
           <textarea id="character-description" name="description" maxLength={2000} rows={4} value={description} onChange={event=>setDescription(event.target.value)} placeholder="A knight in a forest-green tunic and cape, steel armor, brown boots, carrying a sword" />
         </>}

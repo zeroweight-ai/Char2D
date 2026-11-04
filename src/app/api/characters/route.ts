@@ -13,7 +13,8 @@ export const dynamic="force-dynamic";
 const MAX_UPLOAD=10*1024*1024;
 export async function GET() {
   const list=getDatabase().db.select({id:characters.id}).from(characters).orderBy(desc(characters.createdAt)).all();
-  return Response.json(list.map(row=>getCharacter(row.id)));
+  // One unreadable character (e.g. a legacy top-down one) must not hide the rest.
+  return Response.json(list.flatMap(row=>{try{const character=getCharacter(row.id);return character?[character]:[];}catch(error){console.error(`Skipping character ${row.id}:`,error);return [];}}));
 }
 export async function POST(request:Request) {
   if(!config.fakeAI && !config.apiKey) return Response.json({error:"Configure your Muse API key in Settings before generating."},{status:503});
