@@ -4,18 +4,20 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { PixelIcon } from "./PixelIcon";
+import { MAX_CHARACTER_ZIP_BYTES } from "@/lib/character-archive";
 const ACCEPTED=["image/png","image/jpeg","image/webp"];
 export function CreateCharacter() {
   const router=useRouter();
-  const [mode,setMode]=useState<"upload"|"prompt">("upload");
+  const [mode,setMode]=useState<"upload"|"prompt"|"zip">("upload");
   const [file,setFile]=useState<File|null>(null);
+  const [archive,setArchive]=useState<File|null>(null);
   const [preview,setPreview]=useState("");
   const [dragging,setDragging]=useState(false);
   const fileInput=useRef<HTMLInputElement>(null);
   const [name,setName]=useState(""),[description,setDescription]=useState("");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
-  const health=useQuery<{mode:string;keyPresent:boolean}>({queryKey:["health"],queryFn:async()=>{const r=await fetch("/api/settings/health");if(!r.ok)throw new Error("Could not check AI connection");return r.json();}});
+  const health=useQuery<{mode:string;keyPresent:boolean}>({queryKey:["health"],enabled:mode!=="zip",queryFn:async()=>{const r=await fetch("/api/settings/health");if(!r.ok)throw new Error("Could not check AI connection");return r.json();}});
   useEffect(()=>{
     if(!file) {setPreview("");return;}
     const url=URL.createObjectURL(file);setPreview(url);
@@ -27,15 +29,23 @@ export function CreateCharacter() {
     if(next.size>10*1024*1024){setError("Images must be 10 MB or smaller.");return;}
     setFile(next);
   }
-  const missing=[mode==="upload"&&!file?"an image":mode==="prompt"&&!description.trim()?"a description":null,!name.trim()?"a name":null].filter(Boolean) as string[];
+  function pickArchive(next:File|undefined|null){
+    setError("");if(!next)return;
+    if(!next.name.toLowerCase().endsWith(".zip")){setError("Choose a character ZIP downloaded from Char2D.");return;}
+    if(next.size>MAX_CHARACTER_ZIP_BYTES){setError("Character ZIPs must be 100 MB or smaller.");return;}
+    setArchive(next);
+  }
+  const missing=[mode==="upload"&&!file?"an image":mode==="prompt"&&!description.trim()?"a description":mode==="zip"&&!archive?"a ZIP file":null,mode!=="zip"&&!name.trim()?"a name":null].filter(Boolean) as string[];
   async function submit(event:React.FormEvent<HTMLFormElement>) {
     event.preventDefault();setError("");
     if(missing.length){setError(`Add ${missing.join(" and ")} first.`);return;}
     const form=new FormData(event.currentTarget);form.set("mode",mode);form.delete("creation-mode");form.delete("image-picker");
+    form.delete("archive-picker");
     if(mode==="upload"&&file){form.set("image",file);form.set("description","");}
+    if(mode==="zip"&&archive){form.delete("mode");form.set("archive",archive);}
     setBusy(true);
     try {
-      const response=await fetch("/api/characters",{method:"POST",body:form});
+      const response=await fetch(mode==="zip"?"/api/characters/import":"/api/characters",{method:"POST",body:form});
       const result=await response.json();
       if(!response.ok) throw new Error(result.error ?? "Could not create character");
       router.push(`/characters/${result.id}`);
@@ -72,13 +82,13 @@ export function CreateCharacter() {
         </>}
       </section>
       <section className="form-step" aria-labelledby="step-name">
-        <div className="step-head"><span className="step-no">2</span><h2 id="step-name">Give it a name</h2></div>
-        <label className="sr-only" htmlFor="character-name">Character name</label>
-        <input id="character-name" name="name" maxLength={80} placeholder="e.g. Rowan the Green Knight" value={name} onChange={event=>setName(event.target.value)} />
+        <div className="step-head"><span className="step-no">2</span><h2 id="step-name">{mode==="zip"?"Rename it (optional)":"Give it a name"}</h2></div>
+        <label className="sr-only" htmlFor="character-name">{mode==="zip"?"Character name (optional)":"Character name"}</label>
+        <input id="character-name" name="name" maxLength={80} placeholder={mode==="zip"?"Leave blank to keep the exported name":"e.g. Rowan the Green Knight"} value={name} onChange={event=>setName(event.target.value)} />
       </section>
       <div className="submit-row">
-        <button type="submit" className="big">{busy ? "Starting…":"Generate character sheet"}</button>
-        <p className="fine-print" aria-live="polite">{missing.length?`Add ${missing.join(" and ")} to continue.`:`${cost} Takes a minute or two.`.trim()}</p>
+        <button type="submit" className="big">{mode==="zip"?(busy?"Importing…":"Import character"):(busy?"Starting…":"Generate character sheet")}</button>
+        <p className="fine-print" aria-live="polite">{missing.length?`Add ${missing.join(" and ")} to continue.`:mode==="zip"?"Restores your frames, moves and controls. No AI generation.":`${cost} Takes a minute or two.`.trim()}</p>
       </div>
       {error && <p className="error" role="alert">{error}</p>}
     </fieldset>
