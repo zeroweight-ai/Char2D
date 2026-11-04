@@ -1,7 +1,7 @@
 import type { WorldInteractions } from "./interactions";
 import type { TreasureChest } from "./world";
 
-// The market backdrop has no baked-in collectibles. Draw interactive props on
+// The village backdrop has no baked-in collectibles. Draw interactive props on
 // their own layer so collecting coins and breaking chests reveals clean scenery.
 function drawChest(context: CanvasRenderingContext2D, chest: TreasureChest) {
   context.save();

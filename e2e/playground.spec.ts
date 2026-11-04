@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { CharacterDetail } from "../src/lib/character";
 import type { Manifest } from "../src/lib/manifest";
+import { VILLAGE_MAP, WORLD_GROUND } from "../src/lib/game/world";
 
 function character(id: string, name: string): CharacterDetail {
   const actions = Object.fromEntries(["idle", "walk", "jump", "crouch"].map(key => [key, {
@@ -17,6 +18,19 @@ function character(id: string, name: string): CharacterDetail {
 async function mockCharacters(page: Page, characters: CharacterDetail[]) {
   await page.route("**/api/characters", route => route.fulfill({ json: characters }));
   await page.route("**/test-playground-atlas.svg", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48"><rect x="4" y="2" width="24" height="46" fill="#287932"/></svg>' }));
+}
+
+async function expectFeetOnSurface(page: Page) {
+  const player = page.getByTestId("playground-player");
+  await expect(player).toHaveAttribute("data-grounded", "true");
+  await expect.poll(() => player.evaluate(element => {
+    const canvas = element as HTMLCanvasElement;
+    const pixels = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let y = canvas.height - 1; y >= 0; y--) for (let x = 0; x < canvas.width; x++) {
+      if (pixels[(y * canvas.width + x) * 4 + 3]) return Math.abs(y + 1 - Number(canvas.dataset.y));
+    }
+    return Infinity;
+  })).toBeLessThanOrEqual(2);
 }
 
 test("asset requests compile and return a normal missing-asset response", async ({ request }) => {
@@ -39,9 +53,12 @@ test("choose a generated hero, enter the village, move, jump and change characte
   await dialog.getByRole("button", { name: "Start playing" }).click();
   await expect(dialog).not.toBeVisible();
   const map = page.getByRole("img", { name: /Pixel-art village/ });
-  await expect(map).toHaveAttribute("src", /\/worlds\/market-adventure\.png$/);
+  await expect(map).toHaveAttribute("src", /\/worlds\/village-platformer\.png$/);
   await expect.poll(() => map.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(1672);
+  await expect(map).toHaveCSS("filter", "brightness(0.86) saturate(0.84) contrast(0.96)");
   const player = page.getByTestId("playground-player");
+  await expect(player).toHaveCSS("filter", "none");
+  await expect(page.getByTestId("playground-items")).toHaveCSS("filter", "none");
   await expect(player).toHaveAttribute("aria-label", "Green Knight exploring Market Adventure");
   await expect.poll(() => player.evaluate(element => {
     const canvas = element as HTMLCanvasElement;
@@ -49,8 +66,8 @@ test("choose a generated hero, enter the village, move, jump and change characte
   })).toBe(true);
   const stage = page.getByRole("group", { name: "Village map, keyboard controls" });
   const roadY = Number(await player.getAttribute("data-y"));
-  expect(roadY).toBeGreaterThan(735);
-  expect(roadY).toBeLessThan(750);
+  expect(roadY).toBe(WORLD_GROUND);
+  await expectFeetOnSurface(page);
   await stage.focus();
   await page.keyboard.down("KeyD");
   await expect(player).toHaveAttribute("data-action", "walk");
@@ -80,6 +97,30 @@ test("choose a generated hero, enter the village, move, jump and change characte
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(player).toHaveAttribute("aria-label", "Village Mage exploring Market Adventure");
   await expect(page.getByRole("button", { name: "Back to world map" })).toHaveCount(0);
+});
+
+test("draws the feet on the road and bridge collision surfaces", async ({ page }, testInfo) => {
+  const hero = character("bridge", "Bridge Explorer");
+  hero.manifest!.actions.walk.gameplay.moveSpeed = 400;
+  await mockCharacters(page, [hero]);
+  await page.goto("/playground");
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("radio", { name: /Bridge Explorer/ }).check();
+  await dialog.getByRole("button", { name: "Start playing" }).click();
+  const player = page.getByTestId("playground-player");
+  await expectFeetOnSurface(page);
+  await page.keyboard.down("KeyD");
+  await expect.poll(async () => Number(await player.getAttribute("data-x")), { intervals: [10] }).toBeGreaterThan(1260);
+  await page.keyboard.up("KeyD");
+  await expectFeetOnSurface(page);
+  const x = Number(await player.getAttribute("data-x")), y = Number(await player.getAttribute("data-y"));
+  expect(VILLAGE_MAP.platforms.some(platform => platform.id.startsWith("bridge-") && platform.top === y && x + 26 > platform.left && x - 26 < platform.right)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("bridge-foot-contact.png"), fullPage: true });
+  await page.keyboard.down("KeyA");
+  await expect.poll(async () => Number(await player.getAttribute("data-x")), { intervals: [10] }).toBeLessThan(1000);
+  await page.keyboard.up("KeyA");
+  await expect(player).toHaveAttribute("data-y", String(WORLD_GROUND));
+  await expectFeetOnSurface(page);
 });
 
 test("empty party and cancelled selection allow reopening the character picker on mobile", async ({ page }) => {
@@ -116,12 +157,14 @@ test("lands on higher village platforms, jumps again from a ledge and falls onto
   await page.keyboard.up("KeyD");
   await expect(player).toHaveAttribute("data-y", "767");
   await expect(player).toHaveAttribute("data-grounded", "true");
+  await expectFeetOnSurface(page);
   for (const platformY of [636, 485]) {
     await page.keyboard.press("KeyJ");
     await expect(player).toHaveAttribute("data-grounded", "false");
     await expect(player).toHaveAttribute("data-y", String(platformY));
     await expect(player).toHaveAttribute("data-grounded", "true");
     await expect(player).toHaveAttribute("data-action", "idle");
+    await expectFeetOnSurface(page);
   }
   await page.screenshot({ path: testInfo.outputPath("platform-landing.png"), fullPage: true });
   await page.keyboard.down("KeyD");
@@ -133,12 +176,22 @@ test("lands on higher village platforms, jumps again from a ledge and falls onto
   await page.keyboard.down("KeyA");
   await expect.poll(async () => Number(await player.getAttribute("data-x")), { intervals: [20] }).toBeLessThan(1490);
   await page.keyboard.up("KeyA");
-  for (const platformY of [485, 397, 245]) {
-    await page.keyboard.press("KeyJ");
-    await expect(player).toHaveAttribute("data-grounded", "false");
-    await expect(player).toHaveAttribute("data-y", String(platformY));
-    await expect(player).toHaveAttribute("data-grounded", "true");
-  }
+  await page.keyboard.press("KeyJ");
+  await expect(player).toHaveAttribute("data-y", "485");
+  await expect(player).toHaveAttribute("data-grounded", "true");
+  await page.keyboard.down("KeyA");
+  await expect.poll(async () => Number(await player.getAttribute("data-x")), { intervals: [20] }).toBeLessThan(1290);
+  await page.keyboard.up("KeyA");
+  await page.keyboard.down("KeyW");
+  await expect(player).toHaveAttribute("data-y", "272");
+  await page.keyboard.up("KeyW");
+  await page.keyboard.down("KeyD");
+  await expect.poll(async () => Number(await player.getAttribute("data-x")), { intervals: [20] }).toBeGreaterThan(1420);
+  await page.keyboard.press("KeyJ");
+  await expect.poll(async () => Number(await player.getAttribute("data-x")), { intervals: [20] }).toBeGreaterThan(1490);
+  await page.keyboard.up("KeyD");
+  await expect(player).toHaveAttribute("data-y", "245");
+  await expect(player).toHaveAttribute("data-grounded", "true");
   await page.screenshot({ path: testInfo.outputPath("upper-map-landing.png"), fullPage: true });
 });
 
@@ -222,7 +275,7 @@ test("collects the map coins and attacks both treasure chests for their loot", a
   const coins = page.getByRole("status", { name: "Coins collected" });
   const goblin = page.getByTestId("playground-goblin");
   await expect(coins).toHaveText(/Coins 0/);
-  await expect(items).toHaveAttribute("data-remaining-coins", "5");
+  await expect(items).toHaveAttribute("data-remaining-coins", "10");
   await expect(goblin).toHaveAttribute("data-spawned", "false");
   await expect(page.getByRole("group", { name: "Movement controls" }).getByRole("button", { name: "Attack", exact: true })).toHaveCount(0);
   await expect(page.getByRole("group", { name: "Character actions" }).getByRole("button", { name: "Attack", exact: true })).toHaveCount(1);
@@ -267,13 +320,13 @@ test("collects the map coins and attacks both treasure chests for their loot", a
   await expect(items).toHaveAttribute("data-destroyed-chests", "right-treasure");
   await walkTo(1470);
   await walkTo(1580);
-  await expect(coins).toHaveText(/Coins 10/);
+  await expect(coins).toHaveText(/Coins 15/);
   await walkTo(1400);
   await page.screenshot({ path: testInfo.outputPath("right-chest-destroyed.png"), fullPage: true });
 
   await walkTo(590);
   await expect(player).toHaveAttribute("data-y", "431");
-  await expect(coins).toHaveText(/Coins 15/);
+  await expect(coins).toHaveText(/Coins 20/);
   await expect(goblin).toHaveAttribute("data-spawned", "false");
   await expect(items).toHaveAttribute("data-remaining-coins", "0");
   await page.keyboard.press("KeyJ");
@@ -284,7 +337,7 @@ test("collects the map coins and attacks both treasure chests for their loot", a
   await expect(player).toHaveAttribute("data-chests-destroyed", "2");
   await walkTo(350);
   await walkTo(420);
-  await expect(coins).toHaveText(/Coins 25/);
+  await expect(coins).toHaveText(/Coins 30/);
   await expect(goblin).toHaveAttribute("data-spawned", "true");
   await expect(goblin).toHaveAttribute("data-active", "true");
   await expect(goblin).toHaveAttribute("data-direction", "left");
@@ -293,7 +346,7 @@ test("collects the map coins and attacks both treasure chests for their loot", a
   await walkTo(500);
   await page.keyboard.press("KeyK");
   await expect(player).toHaveAttribute("data-attacking", "false");
-  await expect(coins).toHaveText(/Coins 25/);
+  await expect(coins).toHaveText(/Coins 30/);
   await page.screenshot({ path: testInfo.outputPath("collected-coins-and-treasure.png"), fullPage: true });
   const startX = Number(await goblin.getAttribute("data-x"));
   await expect.poll(async () => Number(await goblin.getAttribute("data-x"))).toBeLessThan(startX - 100);
@@ -306,7 +359,7 @@ test("collects the map coins and attacks both treasure chests for their loot", a
   await expect.poll(async () => Number(await goblin.getAttribute("data-x"))).toBeLessThan(1550);
   await page.screenshot({ path: testInfo.outputPath("goblin-soldier-marching-left.png"), fullPage: true });
   await walkTo(1000); // Drop to the road before approaching the spike ledge.
-  await expect(player).toHaveAttribute("data-y", "745");
+  await expect(player).toHaveAttribute("data-y", String(WORLD_GROUND));
   await expect(player).toHaveAttribute("data-grounded", "true");
   const heroOnLeft = Number(await player.getAttribute("data-x")) < Number(await goblin.getAttribute("data-x"));
   const approach = heroOnLeft ? "KeyD" : "KeyA";
@@ -356,7 +409,7 @@ test("collects the map coins and attacks both treasure chests for their loot", a
   await expect(player).toHaveAttribute("data-won", "false");
   await expect(goblin).toHaveAttribute("data-spawned", "false");
   await expect(goblin).toHaveAttribute("data-health", "3");
-  await expect(items).toHaveAttribute("data-remaining-coins", "5");
+  await expect(items).toHaveAttribute("data-remaining-coins", "10");
   await page.keyboard.down("KeyD");
   await expect(player).toHaveAttribute("data-action", "walk");
   await page.keyboard.up("KeyD");

@@ -401,7 +401,7 @@ progress::-moz-progress-bar { background:repeating-linear-gradient(90deg,var(--x
 .playground-hud strong { min-width:2ch; text-align:right; }
 .playground-stage { position:relative; margin:12px var(--px); box-shadow:0 0 0 3px var(--ink),0 10px 0 rgb(24 32 46 / 18%); }
 .playground-stage:focus-visible { outline:4px solid var(--gold-hi); outline-offset:4px; }
-.playground-backdrop { display:block; width:100%; height:auto; image-rendering:pixelated; }
+.playground-backdrop { display:block; width:100%; height:auto; image-rendering:pixelated; filter:brightness(.86) saturate(.84) contrast(.96); }
 .playground-stage canvas { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; }
 .playground-controls button { touch-action:none; user-select:none; min-width:54px; }
 .playground-actions button { flex-wrap:wrap; touch-action:none; user-select:none; max-width:100%; }

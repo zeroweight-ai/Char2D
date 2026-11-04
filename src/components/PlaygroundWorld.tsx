@@ -84,6 +84,7 @@ export function PlaygroundWorld({ character, world, onReplay }: { character: Cha
           const frame = frames[index], scale = zoom * (frame.scale ?? 1);
           context.save();
           context.imageSmoothingEnabled = scale < 1;
+          // The saved foot anchor and collision body share the same world point.
           context.translate(x, y);
           context.scale(mirrored ? -scale : scale, scale);
           context.drawImage(image, frame.x, frame.y, frame.w, frame.h, -frame.anchorX, -frame.anchorY, frame.w, frame.h);
@@ -193,7 +194,7 @@ export function PlaygroundWorld({ character, world, onReplay }: { character: Cha
     </div>
     {goblinSpawned && <p className="key-hint" role="status" aria-label="World events">{won ? "The Goblin Soldier is defeated!" : "All coins collected! Hit the Goblin Soldier three times with your attack to win."}</p>}
     <div ref={stage} className="playground-stage" tabIndex={0} role="group" aria-label="Village map, keyboard controls">
-      <Image key={retry} src="/worlds/market-adventure.png" alt="Pixel-art village with market stalls, a fountain, bridges and grassy platforms" width={WORLD_WIDTH} height={WORLD_HEIGHT} priority unoptimized className="playground-backdrop" onError={() => setError("Could not load the village map. Try again.")} />
+      <Image key={retry} src="/worlds/village-platformer.png" alt="Pixel-art village with a stone arch, fountain, log bridge and grassy platforms" width={WORLD_WIDTH} height={WORLD_HEIGHT} priority unoptimized className="playground-backdrop" onError={() => setError("Could not load the village map. Try again.")} />
       <canvas ref={itemsCanvas} width={WORLD_WIDTH} height={WORLD_HEIGHT} aria-hidden="true" data-testid="playground-items" />
       <canvas ref={goblinCanvas} width={WORLD_WIDTH} height={WORLD_HEIGHT} aria-hidden="true" data-testid="playground-goblin" data-direction="left" />
       <canvas ref={canvas} width={WORLD_WIDTH} height={WORLD_HEIGHT} role="img" aria-label={`${character.name} exploring ${world}`} data-testid="playground-player" />

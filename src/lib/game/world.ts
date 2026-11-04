@@ -1,4 +1,4 @@
-export const WORLD_WIDTH = 1672, WORLD_HEIGHT = 941, WORLD_GROUND = 745;
+export const WORLD_WIDTH = 1672, WORLD_HEIGHT = 941, WORLD_GROUND = 740;
 export const HERO_HEIGHT = 234, HERO_HALF_WIDTH = 26;
 export type BodyShape = { halfWidth: number; height: number };
 export const HERO_BODY: BodyShape = { halfWidth: HERO_HALF_WIDTH, height: HERO_HEIGHT };
@@ -25,12 +25,16 @@ export type WorldMap = {
   hazards: readonly { left: number; right: number; top: number; bottom: number }[];
 };
 
-// Coordinates are in market-adventure.png's native 1672 × 941 pixels.
+// Coordinates are in village-platformer.png's native 1672 × 941 pixels.
 // Floating grass ledges are one-way; the lower road foundations are solid.
+// The broad road uses its walking lane; grass and logs use their top surfaces.
 export const VILLAGE_MAP: WorldMap = {
   width: WORLD_WIDTH, height: WORLD_HEIGHT, spawn: { x: 260, y: WORLD_GROUND },
   platforms: [
-    { id: "village-road", left: 0, right: 1190, top: WORLD_GROUND, bottom: WORLD_HEIGHT },
+    { id: "village-road", left: 0, right: 1094, top: WORLD_GROUND, bottom: WORLD_HEIGHT },
+    { id: "road-step-1", left: 1094, right: 1122, top: 748, bottom: WORLD_HEIGHT },
+    { id: "road-step-2", left: 1122, right: 1178, top: 756, bottom: WORLD_HEIGHT },
+    { id: "road-step-3", left: 1178, right: 1190, top: 764, bottom: WORLD_HEIGHT },
     { id: "bridge-1", left: 1190, right: 1222, top: 760 },
     { id: "bridge-2", left: 1222, right: 1262, top: 774 },
     { id: "bridge-3", left: 1262, right: 1302, top: 780 },
@@ -39,10 +43,7 @@ export const VILLAGE_MAP: WorldMap = {
     { id: "right-road", left: 1382, right: WORLD_WIDTH, top: 767, bottom: WORLD_HEIGHT },
     { id: "mushroom-ledge", left: 1350, right: WORLD_WIDTH, top: 636 },
     { id: "chicken-ledge", left: 1232, right: 1586, top: 485 },
-    { id: "chicken-barrel", left: 1378, right: 1448, top: 424 },
-    { id: "lower-crates", left: 1455, right: 1570, top: 440 },
-    { id: "upper-crate", left: 1457, right: 1522, top: 397 },
-    { id: "spike-ledge", left: 1078, right: 1244, top: 548 },
+    { id: "spike-ledge", left: 1033, right: 1244, top: 548 },
     { id: "garden-ledge", left: 540, right: 894, top: 431 },
     { id: "left-treasure-ledge", left: 302, right: 555, top: 338 },
     { id: "market-ledge", left: 650, right: 1036, top: 280 },
@@ -51,6 +52,7 @@ export const VILLAGE_MAP: WorldMap = {
   ],
   ladders: [{ id: "pink-ladder", left: 1248, right: 1314, top: 272, bottom: 485 }],
   coins: [
+    ...[500, 650, 800, 950, 1080].map((x, i) => ({ id: `road-coin-${i + 1}`, x, y: WORLD_GROUND - 56, value: 1 })),
     { id: "village-coin-1", x: 594, y: 352, value: 1 },
     { id: "village-coin-2", x: 594, y: 302, value: 1 },
     { id: "village-coin-3", x: 597, y: 254, value: 1 },

@@ -7,7 +7,7 @@ export const COIN_RADIUS = 18;
 type Effect = { kind: "coin" | "chest"; x: number; y: number; value: number; startedAt: number };
 
 export function isAttackAction(key: string, action: Manifest["actions"][string]) {
-  return /(^|_)(attack|slash|punch|kick|strike|fireball|shoot|smash|swing|stab|hit)(_|$)/i.test(key) ||
+  return /(^|_)(attack|slash|punch|kick|strike|fireball|shoot|smash|swing|stab|thrust|hit)(_|$)/i.test(key) ||
     !!action.events?.some(event => /^(attack|hit|damage)$/i.test(event.name));
 }
 

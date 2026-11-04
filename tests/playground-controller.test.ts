@@ -187,18 +187,35 @@ it("falls when walking off a ledge and cannot start a jump in midair", () => {
   expect(controller.action).toBe("idle");
 });
 
-it("reaches the upper map using the saved preset jump and the stacked crates", () => {
+it("reaches the upper treasure ledge using preset jumps and the ladder", () => {
   const controller = setup();
   controller.manifest.actions.walk.gameplay.moveSpeed = 100;
   controller.manifest.actions.jump.gameplay.jumpVelocity = -280;
   controller.x = 1480;
   controller.y = 767;
-  for (const top of [636, 485, 397, 245]) {
+  for (const top of [636, 485]) {
     controller.downAction("jump", "button:jump");
     advance(controller, 1000);
     expect(controller.y).toBe(top);
     expect(controller.grounded).toBe(true);
   }
+  controller.move("left", "button:left");
+  advance(controller, 1000);
+  controller.up("button:left");
+  expect(controller.climb("up", "button:up")).toBe(true);
+  advance(controller, 1300);
+  controller.up("button:up");
+  expect(controller.y).toBe(272);
+  controller.move("right", "button:right");
+  advance(controller, 700);
+  controller.up("button:right");
+  controller.downAction("jump", "button:jump");
+  controller.move("right", "button:right");
+  advance(controller, 500);
+  controller.up("button:right");
+  advance(controller, 500);
+  expect(controller.y).toBe(245);
+  expect(controller.grounded).toBe(true);
 });
 
 it("walks the log bridge in both directions without an invisible flat floor", () => {
@@ -215,6 +232,19 @@ it("walks the log bridge in both directions without an invisible flat floor", ()
   advance(controller, 1000);
   expect(controller.y).toBe(WORLD_GROUND);
   expect(controller.grounded).toBe(true);
+});
+
+it("lands at the map's road, log and grass foot positions", () => {
+  for (const [x, surfaceY] of [[900, 740], [1206, 760], [1248, 774], [1280, 774], [1350, 760], [1500, 767], [1450, 636], [1450, 485], [700, 431], [460, 338], [800, 280], [1280, 272], [1500, 245]]) {
+    const hero = setup();
+    hero.x = x;
+    hero.y = surfaceY - 20;
+    hero.step(500);
+    expect(hero.y, `foot position at x=${x}`).toBe(surfaceY);
+    expect(hero.grounded).toBe(true);
+    hero.step(100);
+    expect(hero.y).toBe(surfaceY);
+  }
 });
 
 it("respawns after touching spikes or falling out of the map and releases held controls", () => {
@@ -460,6 +490,34 @@ it("does not attack with an unbound F key", () => {
   expect(controller.action).toBe("idle");
 });
 
+it("breaks either treasure chest with Staff Orb Thrust through its button or saved key", () => {
+  for (const input of ["button", "key"]) {
+    for (const [index, chest] of VILLAGE_MAP.chests!.entries()) {
+      const manifest = setup().manifest;
+      // Lucia's published move has no attack/hit/damage events.
+      manifest.actions.staff_orb_thrust = {
+        ...manifest.actions.idle, label: "Staff Orb Thrust", playback: "once",
+        directions: { right: { frames: [120, 90, 140, 180].map(durationMs => ({
+          x: 0, y: 0, w: 32, h: 48, anchorX: 16, anchorY: 48, durationMs,
+        })) }, left: { mirrorOf: "right" } },
+        gameplay: { trigger: "press", lockMovement: true, interruptible: false },
+      };
+      const controller = new WorldController(manifest, { p1: { staff_orb_thrust: ["KeyJ"] }, p2: {} });
+      controller.x = index === 0 ? chest.right + 30 : chest.left - 30;
+      controller.y = index === 0 ? 338 : 245;
+      controller.direction = index === 0 ? "left" : "right";
+      if (input === "key") controller.downKey("KeyJ");
+      else expect(controller.downAction("staff_orb_thrust", "button:staff_orb_thrust")).toBe(true);
+      controller.step(40);
+      expect(controller.action).toBe("staff_orb_thrust");
+      expect(controller.items.destroyedChests.size).toBe(0);
+      controller.step(60);
+      expect(controller.items.destroyedChests.has(chest.id)).toBe(true);
+      expect([...controller.items.coins.keys()].filter(id => id.startsWith(`${chest.id}:loot:`))).toHaveLength(10);
+    }
+  }
+});
+
 it("keeps the saved hold and toggle behavior for generated attack buttons", () => {
   for (const trigger of ["hold", "toggle"] as const) {
     const manifest = setup().manifest;
@@ -475,7 +533,7 @@ it("keeps the saved hold and toggle behavior for generated attack buttons", () =
   }
 });
 
-it("summons the goblin only after all 25 coins and continues its walk after input resets", () => {
+it("summons the goblin only after all 30 coins and continues its walk after input resets", () => {
   const controller = setup();
   expect(controller.goblin.spawned).toBe(false);
   for (const coin of VILLAGE_MAP.coins!) {
@@ -483,7 +541,7 @@ it("summons the goblin only after all 25 coins and continues its walk after inpu
     controller.y = Math.max(HERO_HEIGHT, coin.y + 10);
     controller.step(16);
   }
-  expect(controller.items.coinCount).toBe(5);
+  expect(controller.items.coinCount).toBe(10);
   expect(controller.goblin.spawned).toBe(false);
   for (const chest of VILLAGE_MAP.chests!) {
     controller.x = chest.right + 30;
@@ -496,7 +554,7 @@ it("summons the goblin only after all 25 coins and continues its walk after inpu
     controller.step(16);
     advance(controller, 600);
   }
-  expect(controller.items.coinCount).toBe(25);
+  expect(controller.items.coinCount).toBe(30);
   expect(controller.goblin.spawned).toBe(true);
   expect(controller.goblin.active).toBe(true);
   const x = controller.goblin.x;
