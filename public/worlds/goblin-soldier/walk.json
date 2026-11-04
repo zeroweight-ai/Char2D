@@ -1,0 +1,50 @@
+{
+  "name": "Goblin Soldier",
+  "direction": "left",
+  "atlas": {
+    "url": "/worlds/goblin-soldier/walk.png",
+    "width": 2869,
+    "height": 755
+  },
+  "frames": [
+    {
+      "x": 0,
+      "y": 0,
+      "w": 700,
+      "h": 724,
+      "anchorX": 330.38307019814226,
+      "anchorY": 723,
+      "durationMs": 140
+    },
+    {
+      "x": 700,
+      "y": 0,
+      "w": 692,
+      "h": 755,
+      "anchorX": 349.47003738317756,
+      "anchorY": 754,
+      "durationMs": 140
+    },
+    {
+      "x": 1392,
+      "y": 0,
+      "w": 741,
+      "h": 747,
+      "anchorX": 383.16881186690136,
+      "anchorY": 746,
+      "durationMs": 140
+    },
+    {
+      "x": 2133,
+      "y": 0,
+      "w": 736,
+      "h": 746,
+      "anchorX": 402.5523071073572,
+      "anchorY": 745,
+      "durationMs": 140
+    }
+  ],
+  "model": "muse-image-1.0",
+  "source": "Pixel Goblin Brute with Spiked Mace.png",
+  "warnings": []
+}

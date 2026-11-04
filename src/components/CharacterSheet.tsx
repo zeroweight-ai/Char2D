@@ -196,6 +196,7 @@ export function CharacterSheet({id}:{id:string}) {
       </div>
       <div className="hud-actions">
         {character.manifest&&<details className="menu"><summary className="button small">Export ▾</summary><div className="menu-list" onClick={event=>{const menu=event.currentTarget.closest("details");if(menu)menu.open=false;}}>
+          <a href={`/api/characters/${id}/export`} download={`${fileName}-frames.zip`}>All frames (ZIP)</a>
           <a href={character.manifest.atlas.url} download={`${fileName}-atlas.png`}>Sprite atlas (PNG)</a>
           <button type="button" onClick={()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(character.manifest,null,2)],{type:"application/json"}));const link=document.createElement("a");link.href=url;link.download=`${fileName}-manifest.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>Animation manifest (JSON)</button>
           {sheet?.processedAssetId&&<a href={`/api/assets/${sheet.processedAssetId}`} download={`${fileName}-sheet.png`}>Character sheet (PNG)</a>}

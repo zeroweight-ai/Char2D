@@ -25,7 +25,7 @@ npm run sounds:generate # ElevenLabs-generates the default move sounds into publ
 npm run brand:build  # transparent logo variants from media/logo_high.png → public/brand/, src/app/icon.png
 ```
 
-- **Never run `npm run e2e` while a `next dev` is running in this repo.** Both share `.next/`, the build manifest gets clobbered, and the running dev server 404s every route until restarted.
+- Playwright sets `CHAR2D_E2E=1` and compiles into `.next-e2e/`; regular dev uses `.next/`. Keep these directories separate so browser tests can run alongside dev without overwriting its chunks or manifests. Do not run another regular `next dev` or `next build` against `.next/` while dev is running.
 - e2e is fully free (fake AI, fake WAV sounds). Real Muse and ElevenLabs calls cost money; avoid them unless asked, and say how many you made.
 - Migrations apply automatically on DB open (`src/server/db/migrate.ts`); no manual step.
 

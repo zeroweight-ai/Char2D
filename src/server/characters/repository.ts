@@ -39,7 +39,7 @@ export function getCharacter(id:string) {
   return {id:character.id,name:character.name,description:character.description,status:character.status,sourceAssetId:character.sourceAssetId,
     sheet:sheet ? {fullResolution,warnings:sheetWarnings as string[],id:sheet.id,status:sheet.status,rawAssetId:sheet.rawAssetId,processedAssetId:sheet.processedAssetId,version:sheet.version}:null,
     manifest:character.manifestJson?manifestSchema.parse(JSON.parse(character.manifestJson)):null,
-    animation:animationJobs.length?{total:animationJobs.length,done:animationJobs.filter(j=>j.status==="done").length,running:animationJobs.filter(j=>j.status==="running"||j.status==="queued").length,error:animationJobs.find(j=>j.error&&j.error!=="Dependency failed")?.error??animationJobs.find(j=>j.status==="error")?.error??null,warnings:[...new Set(warnings)] as string[],actions:actionList}:null,
+    animation:animationJobs.length||actionList.length?{total:animationJobs.length,done:animationJobs.filter(j=>j.status==="done").length,running:animationJobs.filter(j=>j.status==="running"||j.status==="queued").length,error:animationJobs.find(j=>j.error&&j.error!=="Dependency failed")?.error??animationJobs.find(j=>j.status==="error")?.error??null,warnings:[...new Set(warnings)] as string[],actions:actionList}:null,
     bindings:actionList.length?getBindings(id):{p1:{},p2:{}},
     soundAvailable:soundAvailable(),
     job:job ? {id:job.id,status:job.status,error:job.error,revision:payload?.success ? payload.data.generation ?? null:null}:null};

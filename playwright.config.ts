@@ -4,7 +4,7 @@ export default defineConfig({
   webServer: {
     command: "npx concurrently --kill-others \"next dev --hostname 127.0.0.1 --port 3100\" \"tsx --conditions=react-server src/worker/index.ts\"",
     url: "http://127.0.0.1:3100", reuseExistingServer: false,
-    env: { CHAR2D_FAKE_AI: "1", CHAR2D_DATA_DIR: "./data/e2e" },
+    env: { CHAR2D_E2E: "1", CHAR2D_FAKE_AI: "1", CHAR2D_DATA_DIR: "./data/e2e" },
     timeout: 120_000,
   },
 });

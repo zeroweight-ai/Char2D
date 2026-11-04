@@ -22,6 +22,7 @@
     "muse:image": "node --conditions=react-server --import tsx scripts/generate-muse-image.ts",
     "brand:build": "tsx scripts/build-brand.ts",
     "art:generate": "tsx scripts/generate-ui-art.ts",
+    "goblin:generate": "node --conditions=react-server --import tsx scripts/generate-goblin-walk.ts",
     "sounds:generate": "tsx scripts/generate-default-sounds.ts",
     "assets:clean-empty": "node --conditions=react-server --import tsx scripts/clean-empty-assets.ts"
   },
@@ -34,6 +35,7 @@
     "@tanstack/react-query": "^5.0.0",
     "better-sqlite3": "^12.0.0",
     "drizzle-orm": "^0.45.4",
+    "fflate": "^0.8.3",
     "nanoid": "^5.0.0",
     "next": "^15.5.0",
     "phaser": "^3.90.0",

@@ -16,7 +16,8 @@ Char2D turns a single image into an animated pixel-art game character. It genera
 - **Default actions per view type**: side-scroller (left, right, jump, crouch) or top-down (up, down, left, right)
 - **Chat to animate**: ask for new actions (attack, dash, …) or tweaks to existing ones
 - **Button mapping**: bind keys or gamepad buttons to any action
-- **Playground**: control one or more characters in sample worlds
+- **Playground**: choose a generated hero and explore Market Adventure, collecting coins and battling the goblin
+- **ZIP export and import**: download every published animation frame, then restore the character with its moves, controls, and sounds without AI generation
 
 ## Tech stack
 
@@ -46,7 +47,15 @@ npx playwright install chromium
 npm run e2e
 ```
 
+Browser tests run a separate server on port 3100 with fake AI, data in `data/e2e`, and build output in `.next-e2e`. They can run alongside `npm run dev` without overwriting its `.next` output.
+
 See [setup documentation](docs/setup.md) for scripts and implementation status, [PLAN.md](PLAN.md) for the technical design, and [Muse reference](docs/muse.md) for API integration details. Local data and secrets are ignored by Git.
+
+## Export and restore a character
+
+On a ready character's page, choose **Export → All frames (ZIP)**. The archive contains individual PNGs for every published move and direction, the character sheet, atlas, sounds, and timing/control metadata. Historical animation versions are excluded.
+
+To restore it, open **New character → Upload a ZIP**, choose the downloaded archive, optionally rename it, and click **Import character**. This creates a separate, playable copy without AI calls or a worker job. Uploads support Char2D character ZIPs up to 100 MB. See [the archive format](docs/character-archives.md) for details.
 
 ## Authors
 
